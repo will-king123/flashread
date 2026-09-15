@@ -1,8 +1,14 @@
 import express from 'express';
-import { JSDOM } from 'jsdom';
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { fileURLToPath } from 'url';
 import path from 'path';
+
+let getPdfDocument;
+async function pdfGetDocument(options) {
+  if (!getPdfDocument) {
+    ({ getDocument: getPdfDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs'));
+  }
+  return getPdfDocument(options);
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -11,6 +17,7 @@ const MAX_BYTES = 25 * 1024 * 1024;
 const SITE_URL = process.env.SITE_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
 
 app.set('trust proxy', 1);
+app.get('/health', (_req, res) => res.status(200).send('ok'));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -117,7 +124,8 @@ function extractSections(doc) {
   return sections.filter(s => s.text.length > 30);
 }
 
-function extractHtmlContent(html) {
+async function extractHtmlContent(html) {
+  const { JSDOM } = await import('jsdom');
   const dom = new JSDOM(html);
   const doc = dom.window.document;
 
@@ -141,7 +149,12 @@ function extractHtmlContent(html) {
 }
 
 async function extractPdfPages(buffer, startPage, endPage) {
-  const doc = await getDocument({ data: new Uint8Array(buffer), useSystemFonts: true }).promise;
+  const doc = await pdfGetDocument({
+    data: new Uint8Array(buffer),
+    useSystemFonts: false,
+    disableFontFace: true,
+    isEvalSupported: false,
+  }).promise;
   const totalPages = doc.numPages;
   const start = Math.max(1, startPage || 1);
   const end = Math.min(totalPages, endPage || totalPages);
@@ -267,7 +280,7 @@ app.post('/api/fetch', rateLimit, async (req, res) => {
     }
 
     const html = await response.text();
-    const { title, text, sections } = extractHtmlContent(html);
+    const { title, text, sections } = await extractHtmlContent(html);
 
     if (!text || text.length < 20) {
       return res.status(422).json({ error: htmlExtractError(html, text) });
@@ -288,7 +301,12 @@ app.post('/api/fetch-pdf-info', rateLimit, async (req, res) => {
     const response = await fetchUrl(url);
     const buffer = Buffer.from(await response.arrayBuffer());
     assertSize(buffer.length);
-    const doc = await getDocument({ data: new Uint8Array(buffer), useSystemFonts: true }).promise;
+    const doc = await pdfGetDocument({
+      data: new Uint8Array(buffer),
+      useSystemFonts: false,
+      disableFontFace: true,
+      isEvalSupported: false,
+    }).promise;
 
     res.json({
       type: 'pdf',
@@ -348,6 +366,9 @@ setInterval(() => {
   if (Object.keys(metrics).length) console.log('[metrics]', JSON.stringify(metrics));
 }, 5 * 60 * 1000);
 
-app.listen(PORT, () => {
+process.on('uncaughtException', (err) => console.error('uncaughtException:', err));
+process.on('unhandledRejection', (err) => console.error('unhandledRejection:', err));
+
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Flashread running on port ${PORT}`);
 });

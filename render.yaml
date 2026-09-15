@@ -3,9 +3,6 @@ services:
     name: flashread
     runtime: node
     plan: free
-    buildCommand: npm install
+    buildCommand: npm ci
     startCommand: npm start
-    healthCheckPath: /
-    envVars:
-      - key: NODE_VERSION
-        value: "20"
+    healthCheckPath: /health
