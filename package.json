@@ -13,6 +13,6 @@
   "dependencies": {
     "express": "^4.21.0",
     "jsdom": "^25.0.0",
-    "pdfjs-dist": "^4.8.69"
+    "pdf-parse": "^2.4.5"
   }
 }

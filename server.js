@@ -2,12 +2,10 @@ import express from 'express';
 import { fileURLToPath } from 'url';
 import path from 'path';
 
-let getPdfDocument;
-async function pdfGetDocument(options) {
-  if (!getPdfDocument) {
-    ({ getDocument: getPdfDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs'));
-  }
-  return getPdfDocument(options);
+let PDFParse;
+async function loadPdfParse() {
+  if (!PDFParse) ({ PDFParse } = await import('pdf-parse'));
+  return PDFParse;
 }
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -149,24 +147,29 @@ async function extractHtmlContent(html) {
 }
 
 async function extractPdfPages(buffer, startPage, endPage) {
-  const doc = await pdfGetDocument({
-    data: new Uint8Array(buffer),
-    useSystemFonts: false,
-    disableFontFace: true,
-    isEvalSupported: false,
-  }).promise;
-  const totalPages = doc.numPages;
-  const start = Math.max(1, startPage || 1);
-  const end = Math.min(totalPages, endPage || totalPages);
-
-  let text = '';
-  for (let i = start; i <= end; i++) {
-    const page = await doc.getPage(i);
-    const content = await page.getTextContent();
-    text += content.items.map(item => item.str).join(' ') + ' ';
+  const Parser = await loadPdfParse();
+  const parser = new Parser({ data: buffer });
+  try {
+    const info = await parser.getInfo();
+    const totalPages = info.total;
+    const start = Math.max(1, startPage || 1);
+    const end = Math.min(totalPages, endPage || totalPages);
+    const result = await parser.getText({ first: start, last: end, pageJoiner: ' ' });
+    return { text: cleanText(result.text), totalPages, startPage: start, endPage: end };
+  } finally {
+    await parser.destroy();
   }
+}
 
-  return { text: cleanText(text), totalPages, startPage: start, endPage: end };
+async function pdfPageCount(buffer) {
+  const Parser = await loadPdfParse();
+  const parser = new Parser({ data: buffer });
+  try {
+    const info = await parser.getInfo();
+    return info.total;
+  } finally {
+    await parser.destroy();
+  }
 }
 
 function fetchErrorMessage(err) {
@@ -301,17 +304,12 @@ app.post('/api/fetch-pdf-info', rateLimit, async (req, res) => {
     const response = await fetchUrl(url);
     const buffer = Buffer.from(await response.arrayBuffer());
     assertSize(buffer.length);
-    const doc = await pdfGetDocument({
-      data: new Uint8Array(buffer),
-      useSystemFonts: false,
-      disableFontFace: true,
-      isEvalSupported: false,
-    }).promise;
+    const totalPages = await pdfPageCount(buffer);
 
     res.json({
       type: 'pdf',
       title: parsed.pathname.split('/').pop()?.replace('.pdf', '') || 'PDF',
-      totalPages: doc.numPages,
+      totalPages,
     });
   } catch (err) {
     res.status(500).json({ error: err.message || 'Failed to read PDF' });
