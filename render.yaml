@@ -1,11 +1,9 @@
 services:
   - type: web
     name: flashread
-    runtime: node
+    runtime: docker
     plan: free
     repo: https://github.com/will-king123/flashread
     branch: main
-    buildCommand: npm ci
-    startCommand: npm start
     healthCheckPath: /health
     autoDeployTrigger: commit
