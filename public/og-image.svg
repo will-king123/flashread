@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#f0ebe3"/>
+  <rect x="80" y="80" width="1040" height="470" rx="24" fill="#faf7f2" stroke="#ddd6cb" stroke-width="2"/>
+  <text x="600" y="260" text-anchor="middle" font-family="Georgia, serif" font-size="72" fill="#3a3632">Flashread</text>
+  <text x="600" y="340" text-anchor="middle" font-family="system-ui, sans-serif" font-size="32" fill="#7a746b">Paste a link. Pick what to read. Done.</text>
+  <rect x="420" y="400" width="360" height="64" rx="32" fill="#c45d3e"/>
+  <text x="600" y="444" text-anchor="middle" font-family="system-ui, sans-serif" font-size="28" font-weight="600" fill="#ffffff">speed read any article or PDF</text>
+</svg>

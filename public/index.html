@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flashread — speed read any article or PDF</title>
+  <meta name="description" content="Paste a link or upload a file. Pick sections, set your speed, and read one word at a time.">
+  <meta property="og:title" content="Flashread — speed read any article or PDF">
+  <meta property="og:description" content="Paste a link or upload a file. Pick sections, set your speed, and read one word at a time.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="/og-image.svg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Flashread">
+  <meta name="twitter:description" content="Speed read Wikipedia, articles, and PDFs in your browser.">
+  <meta name="twitter:image" content="/og-image.svg">
+  <meta name="theme-color" content="#c45d3e">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header-brand">
+        <button class="btn btn-icon btn-sm header-back hidden" id="backToSelect" aria-label="Back to selection">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        </button>
+        <h1 class="logo">Flashread</h1>
+      </div>
+      <div class="header-actions">
+        <div class="settings-wrap">
+          <button class="theme-toggle" id="settingsBtn" aria-label="Settings" aria-expanded="false">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+          </button>
+          <div class="settings-popover hidden" id="settingsPopover">
+            <p class="field-label">Accent colour</p>
+            <div class="accent-picker" role="group" aria-label="Accent colour">
+              <button type="button" class="accent-swatch" data-accent="terracotta" aria-label="Terracotta" aria-pressed="true" style="--swatch: #c45d3e"></button>
+              <button type="button" class="accent-swatch" data-accent="sage" aria-label="Sage" aria-pressed="false" style="--swatch: #5c8a6e"></button>
+              <button type="button" class="accent-swatch" data-accent="teal" aria-label="Teal" aria-pressed="false" style="--swatch: #2a8a8a"></button>
+              <button type="button" class="accent-swatch" data-accent="indigo" aria-label="Indigo" aria-pressed="false" style="--swatch: #5b6eae"></button>
+              <button type="button" class="accent-swatch" data-accent="amber" aria-label="Amber" aria-pressed="false" style="--swatch: #c17f24"></button>
+              <button type="button" class="accent-swatch" data-accent="rose" aria-label="Rose" aria-pressed="false" style="--swatch: #b85c7a"></button>
+            </div>
+          </div>
+        </div>
+        <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+        <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+        </svg>
+        <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <!-- Step 1: Input -->
+      <section class="panel" id="inputPanel">
+        <p class="tagline">Paste a link. Pick what to read. Done.</p>
+
+        <div class="resume-banner hidden" id="resumeBanner">
+          <div class="resume-info">
+            <span class="resume-label">Continue reading</span>
+            <span class="resume-title" id="resumeTitle"></span>
+          </div>
+          <div class="resume-actions">
+            <button class="btn btn-primary btn-sm" id="resumeBtn">Continue</button>
+            <button class="btn btn-text btn-sm" id="dismissResume">Dismiss</button>
+          </div>
+        </div>
+
+        <form class="link-form" id="linkForm">
+          <div class="link-row">
+            <input type="text" id="linkInput" placeholder="Wikipedia, article, PDF link…" autofocus autocomplete="off">
+            <button type="submit" class="btn btn-primary" id="goBtn">Go</button>
+          </div>
+        </form>
+
+        <div class="file-drop" id="fileDrop">
+          <input type="file" id="fileInput" accept=".txt,.pdf,text/plain,application/pdf" hidden>
+          <p class="file-drop-label">Or drop a <strong>.txt</strong> or <strong>.pdf</strong> file here</p>
+          <button type="button" class="btn btn-secondary btn-sm" id="fileBrowseBtn">Browse files</button>
+        </div>
+
+        <p class="status" id="inputStatus"></p>
+
+        <button class="btn btn-text text-toggle" id="textToggle">Or paste text directly</button>
+        <div class="text-fallback hidden" id="textFallback">
+          <textarea id="textInput" placeholder="Paste your text here…" rows="6"></textarea>
+          <button class="btn btn-primary btn-start" id="textStartBtn">Start reading</button>
+        </div>
+
+        <div class="history-wrap hidden" id="historyWrap">
+          <p class="history-title">History</p>
+          <ul class="recent-list" id="recentList"></ul>
+        </div>
+
+        <button class="btn btn-text" id="findWpmBtn">Not sure how fast you read?</button>
+      </section>
+
+      <!-- WPM Finder -->
+      <section class="panel hidden" id="wpmFinderPanel">
+        <button class="btn btn-text back-link" id="wpmFinderBack">← Back</button>
+
+        <div id="wpmFinderIntro">
+          <h2 class="finder-title">How fast can you read?</h2>
+          <p class="finder-desc">Words flash one at a time, starting slow and getting faster every ten seconds. Hit stop when you can't keep up.</p>
+          <button class="btn btn-primary btn-start" id="wpmFinderStart">Start</button>
+        </div>
+
+        <div class="finder-active hidden" id="wpmFinderActive">
+          <p class="finder-wpm" id="finderWpmLabel">250 WPM</p>
+          <div class="reader-display finder-display">
+            <div class="focal-guide"></div>
+            <div class="word-container" id="finderWordContainer"></div>
+          </div>
+          <button class="btn btn-primary btn-start" id="wpmFinderStop">Stop</button>
+        </div>
+
+        <div class="finder-result hidden" id="wpmFinderResult">
+          <h2 class="finder-title">Your speed</h2>
+          <p class="finder-score"><span id="finderScore">350</span> WPM</p>
+          <p class="finder-desc">Use this as your default reading speed?</p>
+          <button class="btn btn-primary btn-start" id="wpmFinderUse">Use this speed</button>
+          <button class="btn btn-text" id="wpmFinderRetry">Try again</button>
+        </div>
+      </section>
+
+      <!-- Step 2: Select content -->
+      <section class="panel panel-select hidden" id="selectPanel">
+        <div class="select-header">
+          <button class="btn btn-text back-link" id="backToInput">← New link</button>
+          <div class="select-title-row">
+            <h2 class="doc-title" id="docTitle"></h2>
+            <button type="button" class="btn btn-text btn-sm share-link-btn hidden" id="shareLinkBtn">Copy link</button>
+          </div>
+        </div>
+
+        <div class="select-body">
+          <div class="select-card pdf-picker hidden" id="pdfPicker">
+            <label class="field-label">Pages to read</label>
+            <div class="page-row">
+              <input type="number" id="pageFrom" min="1" value="1" aria-label="From page">
+              <span class="page-sep">to</span>
+              <input type="number" id="pageTo" min="1" value="1" aria-label="To page">
+              <span class="page-total" id="pageTotal"></span>
+            </div>
+            <p class="hint" id="pdfStatus">Loading pages…</p>
+          </div>
+
+          <div class="select-card select-speed">
+            <div class="speed-header">
+              <span class="field-label">Speed</span>
+              <span class="speed-value"><span id="wpmValue">300</span> WPM</span>
+            </div>
+            <input type="range" id="wpmSlider" min="100" max="1000" value="300" step="10" aria-label="Reading speed">
+            <div class="wpm-presets">
+              <button type="button" class="preset" data-wpm="250">250</button>
+              <button type="button" class="preset active" data-wpm="300">300</button>
+              <button type="button" class="preset" data-wpm="500">500</button>
+            </div>
+          </div>
+
+          <details class="select-sections section-picker hidden" id="sectionPicker">
+            <summary>Choose which sections to read</summary>
+            <div class="picker-actions">
+              <button class="btn btn-text btn-sm" id="selectAllBtn">All</button>
+              <button class="btn btn-text btn-sm" id="selectNoneBtn">None</button>
+            </div>
+            <ul class="section-list" id="sectionList"></ul>
+          </details>
+
+          <details class="select-more">
+            <summary>More options</summary>
+            <label class="checkbox-label inline">
+              <input type="checkbox" id="focalToggle" checked>
+              <span>Focal point</span>
+            </label>
+            <label class="checkbox-label inline">
+              <input type="checkbox" id="sentencePauseToggle" checked>
+              <span>Longer pause at full stops</span>
+            </label>
+            <details class="preview-wrap" id="previewWrap">
+              <summary>Preview &amp; highlight text</summary>
+              <p class="preview-hint">Highlight any passage below to read just that part.</p>
+              <div class="preview" id="preview"></div>
+            </details>
+          </details>
+        </div>
+
+        <div class="select-footer">
+          <div class="select-stats">
+            <span class="word-count" id="wordCount">0 words selected</span>
+            <span class="time-estimate" id="timeEstimate"></span>
+          </div>
+          <button class="btn btn-primary btn-start" id="startBtn">Start reading</button>
+        </div>
+      </section>
+
+      <!-- Step 3: Reader -->
+      <section class="reader hidden" id="readerPanel">
+        <div class="reader-chrome">
+          <div class="reader-topbar">
+            <button class="btn btn-text btn-sm" id="fullscreenBtn" title="Fullscreen">Fullscreen</button>
+          </div>
+        </div>
+        <div class="reader-display" id="readerDisplay" title="Tap to pause">
+          <div class="focal-guide"></div>
+          <div class="word-container" id="wordContainer"></div>
+          <div class="finish-overlay hidden" id="finishOverlay">
+            <p class="finish-heading">Finished</p>
+            <p class="finish-stats" id="finishStats"></p>
+            <div class="finish-actions">
+              <button class="btn btn-primary" id="readAgainBtn">Read again</button>
+              <button class="btn btn-secondary hidden" id="continuePdfBtn">Continue next pages</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="reader-progress">
+          <div class="progress-bar" id="progressBar">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
+          <span class="progress-text" id="progressText">0 / 0</span>
+        </div>
+
+        <div class="reader-play-bar">
+          <button class="btn btn-primary btn-play" id="playPauseBtn">
+            <svg class="icon-play" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            <svg class="icon-pause hidden" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+          </button>
+        </div>
+
+        <div class="reader-chrome">
+        <div class="reader-controls">
+          <button class="btn btn-icon" id="backStartBtn" title="Back to start">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6V6zm3.5 6l8.5 6V6l-8.5 6z"/></svg>
+          </button>
+          <button class="btn btn-icon" id="backBtn" title="Back 10 words">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg>
+          </button>
+          <button class="btn btn-icon" id="forwardBtn" title="Forward 10 words">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg>
+          </button>
+        </div>
+
+        <div class="reader-meta">
+          <div class="reader-speed">
+            <button class="btn btn-icon btn-sm" id="wpmDown" title="Slower">−</button>
+            <span id="readerWpm">300 WPM</span>
+            <button class="btn btn-icon btn-sm" id="wpmUp" title="Faster">+</button>
+          </div>
+          <span class="time-left" id="timeLeft"></span>
+        </div>
+
+        <div class="reader-settings">
+          <div class="inline-control font-control">
+            <label for="fontSlider">Size</label>
+            <input type="range" id="fontSlider" min="1.5" max="4.5" value="3" step="0.25">
+          </div>
+        </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="analytics.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

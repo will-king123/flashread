@@ -1,0 +1,17 @@
+{
+  "name": "Flashread",
+  "short_name": "Flashread",
+  "description": "Paste a link. Pick what to read. Speed read one word at a time.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f0ebe3",
+  "theme_color": "#c45d3e",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
