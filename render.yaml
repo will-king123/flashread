@@ -7,5 +7,4 @@ services:
     branch: main
     buildCommand: npm ci --omit=optional
     startCommand: npm start
-    healthCheckPath: /health
     autoDeployTrigger: commit
