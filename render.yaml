@@ -1,10 +1,8 @@
 services:
   - type: web
-    name: flashread-app
-    runtime: node
+    name: flashread-live
+    runtime: docker
     plan: free
     repo: https://github.com/will-king123/flashread
     branch: main
-    buildCommand: npm install
-    startCommand: node server.js
     autoDeployTrigger: commit
