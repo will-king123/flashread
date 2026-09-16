@@ -1,5 +1,5 @@
-const CACHE = 'flashread-v1';
-const PRECACHE = ['/', '/index.html', '/app.js', '/analytics.js', '/styles.css', '/favicon.svg', '/manifest.json', '/og-image.svg'];
+const CACHE = 'flashread-v4';
+const PRECACHE = ['/', '/index.html', '/app.js', '/analytics.js', '/styles.css', '/favicon.svg', '/icon-192.png', '/icon-512.png', '/manifest.json', '/og-image.svg', '/privacy.html'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -30,15 +30,18 @@ self.addEventListener('fetch', (event) => {
 
   if (request.method !== 'GET') return;
 
+  const isAppShell = ['/app.js', '/styles.css', '/index.html'].includes(url.pathname);
+
   event.respondWith(
-    caches.match(request).then((cached) => {
-      const network = fetch(request).then((response) => {
-        if (response.ok && url.origin === self.location.origin) {
-          caches.open(CACHE).then((cache) => cache.put(request, response.clone()));
-        }
-        return response;
-      });
-      return cached || network;
-    })
+    fetch(request).then((response) => {
+      if (response.ok && url.origin === self.location.origin) {
+        caches.open(CACHE).then((cache) => cache.put(request, response.clone()));
+      }
+      return response;
+    }).catch(() => caches.match(request).then((cached) => {
+      if (cached) return cached;
+      if (isAppShell && url.pathname !== '/index.html') return caches.match('/index.html');
+      return Response.error();
+    }))
   );
 });

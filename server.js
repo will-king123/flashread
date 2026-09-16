@@ -354,6 +354,23 @@ app.post('/api/event', rateLimit, (req, res) => {
   res.status(204).end();
 });
 
+app.get('/api/metrics', (req, res) => {
+  const token = process.env.METRICS_TOKEN;
+  if (token && req.query.token !== token) {
+    return res.status(401).json({ error: 'Invalid or missing token' });
+  }
+  res.json({ metrics, since: process.uptime() });
+});
+
+app.get('/sitemap.xml', (_req, res) => {
+  const base = SITE_URL.replace(/\/$/, '');
+  res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>${base}/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>${base}/privacy.html</loc><changefreq>monthly</changefreq><priority>0.3</priority></url>
+</urlset>`);
+});
+
 app.use((err, req, res, next) => {
   if (err.type === 'entity.too.large') {
     return res.status(413).json({ error: 'File is too large (max 25 MB) — try a smaller PDF or paste the text' });

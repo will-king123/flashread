@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Metrics — Flashread</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    .metrics-page { max-width: 480px; margin: 0 auto; padding: 2rem 1.5rem; }
+    .metrics-page h1 { font-size: 1.25rem; margin-bottom: 0.25rem; }
+    .metrics-page .hint { font-size: 0.8125rem; color: var(--text-muted); margin-bottom: 1.5rem; }
+    .metric-row { display: flex; justify-content: space-between; padding: 0.625rem 0; border-bottom: 1px solid var(--border); font-size: 0.9375rem; }
+    .metric-row span:last-child { font-variant-numeric: tabular-nums; font-weight: 500; }
+    .metrics-error { color: var(--accent); font-size: 0.875rem; }
+    .metrics-back { display: inline-block; margin-bottom: 1.5rem; font-size: 0.875rem; color: var(--text-muted); text-decoration: none; }
+    .metrics-back:hover { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="metrics-page">
+    <a class="metrics-back" href="/">← Back</a>
+    <h1>Usage metrics</h1>
+    <p class="hint">Anonymous counts since last server restart. Resets on deploy.</p>
+    <div id="metricsList"></div>
+    <p class="metrics-error hidden" id="metricsError"></p>
+  </div>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const token = params.get('token') || '';
+    const url = token ? `/api/metrics?token=${encodeURIComponent(token)}` : '/api/metrics';
+
+    fetch(url)
+      .then(r => r.ok ? r.json() : r.json().then(d => Promise.reject(new Error(d.error || 'Failed'))))
+      .then(data => {
+        const labels = {
+          page_view: 'Page views',
+          fetch_success: 'Links fetched',
+          fetch_error: 'Fetch errors',
+          read_start: 'Reads started',
+          read_finish: 'Reads finished',
+        };
+        const list = document.getElementById('metricsList');
+        const keys = Object.keys(data.metrics).filter(k => !k.includes(':')).sort();
+        if (!keys.length) {
+          list.innerHTML = '<p class="hint">No events yet.</p>';
+          return;
+        }
+        for (const key of keys) {
+          const row = document.createElement('div');
+          row.className = 'metric-row';
+          row.innerHTML = `<span>${labels[key] || key}</span><span>${data.metrics[key].toLocaleString()}</span>`;
+          list.appendChild(row);
+        }
+        const detailKeys = Object.keys(data.metrics).filter(k => k.includes(':')).sort();
+        for (const key of detailKeys) {
+          const row = document.createElement('div');
+          row.className = 'metric-row';
+          row.innerHTML = `<span>${key.replace(':', ' · ')}</span><span>${data.metrics[key].toLocaleString()}</span>`;
+          list.appendChild(row);
+        }
+      })
+      .catch(err => {
+        document.getElementById('metricsError').textContent = err.message;
+        document.getElementById('metricsError').classList.remove('hidden');
+      });
+  </script>
+</body>
+</html>

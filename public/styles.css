@@ -172,6 +172,84 @@ body {
 [data-theme="dark"] .icon-sun { display: none; }
 
 /* Input panel */
+.examples {
+  margin-bottom: 1.25rem;
+}
+
+.examples-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.example-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.example-chip {
+  font-family: inherit;
+  font-size: 0.8125rem;
+  padding: 0.4375rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.example-chip:hover {
+  border-color: var(--accent);
+  background: var(--select-bg);
+}
+
+.install-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.875rem 1rem;
+  margin-bottom: 1.25rem;
+  background: var(--select-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.install-text {
+  font-size: 0.875rem;
+  color: var(--text);
+  margin: 0;
+  flex: 1;
+  min-width: 10rem;
+}
+
+.install-actions {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.footer-links {
+  margin-top: 2rem;
+  text-align: center;
+  font-size: 0.8125rem;
+}
+
+.footer-links a {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.footer-links a:hover {
+  color: var(--accent);
+}
+
 .tagline {
   font-size: 1.125rem;
   color: var(--text-muted);
@@ -883,7 +961,9 @@ body {
   min-height: 80vh;
 }
 
-.reader.focus-mode .reader-chrome {
+.reader.focus-mode .reader-topbar,
+.reader.focus-mode .reader-controls,
+.reader.focus-mode .reader-meta {
   display: none;
 }
 
@@ -1017,7 +1097,7 @@ body {
 
 .word-container {
   font-family: 'Literata', Georgia, serif;
-  font-size: min(calc(var(--reader-font-size, 3) * 1rem), 20vw, 45cqw);
+  font-size: calc(var(--reader-font-size, 3.5) * 1rem);
   font-weight: 400;
   letter-spacing: 0.02em;
   white-space: nowrap;

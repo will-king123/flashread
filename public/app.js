@@ -7,7 +7,9 @@ let finishTimer = null;
 let wpm = 300;
 let focalEnabled = true;
 let sentencePauseEnabled = true;
-let fontSize = 3;
+let fontSize = 3.5;
+const FONT_SIZE_MIN = 2;
+const FONT_SIZE_MAX = 6;
 let loadedContent = null;
 let manualSelection = '';
 let currentUrl = '';
@@ -18,6 +20,46 @@ const PDF_WORDS_PER_PAGE_ESTIMATE = 250;
 let readingStartTime = null;
 let touchStartX = 0;
 let savedProgress = null;
+let deferredInstallPrompt = null;
+
+const SAMPLE_TEXT = 'Speed reading works by presenting one word at a time at a fixed point on screen. Your eyes stay still while the words come to you. This cuts out the time spent moving your eyes across lines and reduces regressions — those moments when you jump back to re-read something.';
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function apiFetch(url, options, retries = 2) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url, options);
+      if ([502, 503, 504].includes(res.status) && attempt < retries) {
+        setStatus('Server waking up… retrying', false);
+        await sleep(2000 * (attempt + 1));
+        continue;
+      }
+      return res;
+    } catch (err) {
+      if (attempt < retries) {
+        setStatus('Server waking up… retrying', false);
+        await sleep(2000 * (attempt + 1));
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
+function markUsed() {
+  localStorage.setItem('flashread-used', '1');
+  document.getElementById('examples')?.classList.add('hidden');
+}
+
+function maybeShowInstallNudge() {
+  if (!deferredInstallPrompt) return;
+  if (localStorage.getItem('flashread-install-dismissed')) return;
+  if (window.matchMedia('(display-mode: standalone)').matches) return;
+  document.getElementById('installBanner')?.classList.remove('hidden');
+}
 
 // WPM finder state
 let calWpm = 250;
@@ -183,6 +225,7 @@ const wpmValue = document.getElementById('wpmValue');
 const focalToggle = document.getElementById('focalToggle');
 const sentencePauseToggle = document.getElementById('sentencePauseToggle');
 const fontSlider = document.getElementById('fontSlider');
+const fontSizeValue = document.getElementById('fontSizeValue');
 const fileDrop = document.getElementById('fileDrop');
 const fileInput = document.getElementById('fileInput');
 const fileBrowseBtn = document.getElementById('fileBrowseBtn');
@@ -211,6 +254,10 @@ const themeToggle = document.getElementById('themeToggle');
 const settingsBtn = document.getElementById('settingsBtn');
 const settingsPopover = document.getElementById('settingsPopover');
 const appEl = document.querySelector('.app');
+const examplesEl = document.getElementById('examples');
+const installBanner = document.getElementById('installBanner');
+const installBtn = document.getElementById('installBtn');
+const installDismiss = document.getElementById('installDismiss');
 
 function syncReaderHeader() {
   backToSelect.classList.toggle('hidden', readerPanel.classList.contains('hidden'));
@@ -665,14 +712,26 @@ sentencePauseToggle.addEventListener('change', () => {
   if (isPlaying) restartTimer();
 });
 
-function setFontSize(value) {
-  fontSize = value;
-  document.documentElement.style.setProperty('--reader-font-size', fontSize);
-  localStorage.setItem('flashread-font-size', fontSize);
-  renderWord();
+function formatFontSize(value) {
+  return Number(value.toFixed(2)).toString();
 }
 
-fontSlider.addEventListener('input', () => setFontSize(parseFloat(fontSlider.value)));
+function setFontSize(value) {
+  fontSize = Math.max(FONT_SIZE_MIN, Math.min(FONT_SIZE_MAX, value));
+  document.documentElement.style.setProperty('--reader-font-size', String(fontSize));
+  localStorage.setItem('flashread-font-size', String(fontSize));
+  if (fontSlider) {
+    fontSlider.value = fontSize;
+    fontSlider.setAttribute('aria-valuenow', fontSize);
+  }
+  if (fontSizeValue) fontSizeValue.textContent = formatFontSize(fontSize);
+  if (words.length) renderWord();
+}
+
+if (fontSlider) {
+  fontSlider.addEventListener('input', () => setFontSize(parseFloat(fontSlider.value)));
+  fontSlider.addEventListener('change', () => setFontSize(parseFloat(fontSlider.value)));
+}
 
 textToggle.addEventListener('click', () => {
   textFallback.classList.toggle('hidden');
@@ -688,6 +747,7 @@ linkForm.addEventListener('submit', async (e) => {
   if (!input) return;
 
   if (!isUrl(input)) {
+    markUsed();
     showSelectPanel({ type: 'text', title: 'Pasted text', text: input, sections: [] });
     return;
   }
@@ -698,7 +758,7 @@ linkForm.addEventListener('submit', async (e) => {
 
   try {
     if (looksLikePdf(input)) {
-      const infoRes = await fetch('/api/fetch-pdf-info', {
+      const infoRes = await apiFetch('/api/fetch-pdf-info', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: input }),
@@ -717,13 +777,14 @@ linkForm.addEventListener('submit', async (e) => {
 
       showSelectPanel(loadedContent);
       saveRecent(input, info.title);
+      markUsed();
       updatePdfEstimate();
       loadPdfPages();
       setLoading(false);
       return;
     }
 
-    const res = await fetch('/api/fetch', {
+    const res = await apiFetch('/api/fetch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: input }),
@@ -733,6 +794,7 @@ linkForm.addEventListener('submit', async (e) => {
 
     loadedContent = data;
     saveRecent(input, data.title);
+    markUsed();
     showSelectPanel(data);
     flashreadTrack('fetch_success', { type: data.type });
   } catch (err) {
@@ -758,7 +820,7 @@ async function loadPdfPages() {
   startBtn.disabled = true;
 
   try {
-    const res = await fetch('/api/fetch', {
+    const res = await apiFetch('/api/fetch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: currentUrl, startPage: from, endPage: to }),
@@ -971,6 +1033,7 @@ backToInput.addEventListener('click', () => {
 textStartBtn.addEventListener('click', () => {
   const text = textInput.value.trim();
   if (!text) return;
+  markUsed();
   showSelectPanel({ type: 'text', title: 'Pasted text', text, sections: [] });
 });
 
@@ -997,12 +1060,13 @@ function fitWordSize(container) {
   if (!display) return;
 
   const maxPx = fontSize * 16;
+  const minPx = Math.max(12, fontSize * 8);
   const available = display.clientWidth - 32;
   container.style.fontSize = `${maxPx}px`;
 
   if (available <= 0 || container.scrollWidth <= available) return;
 
-  let lo = 16;
+  let lo = minPx;
   let hi = maxPx;
   while (lo < hi) {
     const mid = Math.ceil((lo + hi) / 2);
@@ -1160,6 +1224,7 @@ function finish() {
   invalidateSavedProgress();
   clearSession();
   flashreadTrack('read_finish', { words: words.length, wpm, type: loadedContent?.type || 'text' });
+  maybeShowInstallNudge();
 }
 
 function togglePlayPause() {
@@ -1267,6 +1332,7 @@ async function handleFile(file) {
       setStatus('That file is empty', true);
       return;
     }
+    markUsed();
     showSelectPanel({ type: 'text', title: file.name.replace(/\.txt$/i, ''), text, sections: [] });
     return;
   }
@@ -1274,7 +1340,7 @@ async function handleFile(file) {
   if (name.endsWith('.pdf') || file.type === 'application/pdf') {
     setStatus('Reading PDF…');
     try {
-      const res = await fetch('/api/parse-pdf', {
+      const res = await apiFetch('/api/parse-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/pdf' },
         body: file,
@@ -1295,6 +1361,7 @@ async function handleFile(file) {
       pageTo.max = data.totalPages;
       pageTo.value = data.endPage || data.totalPages;
       pageTotal.textContent = `of ${data.totalPages}`;
+      markUsed();
       showSelectPanel(loadedContent);
       pdfWordsPerPage = countWords(data.text) / (data.endPage - data.startPage + 1);
       updatePdfEstimate();
@@ -1519,7 +1586,7 @@ if (savedFontSize) {
   fontSlider.value = savedFontSize;
   setFontSize(parseFloat(savedFontSize));
 } else {
-  setFontSize(3);
+  setFontSize(3.5);
 }
 
 let resizeFitTimer;
@@ -1529,6 +1596,42 @@ window.addEventListener('resize', () => {
     if (!readerPanel.classList.contains('hidden') && words.length) renderWord();
   }, 100);
 });
+
+document.querySelectorAll('.example-chip').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (btn.dataset.example === 'text') {
+      textFallback.classList.remove('hidden');
+      textToggle.classList.add('hidden');
+      textInput.value = SAMPLE_TEXT;
+      textInput.focus();
+      return;
+    }
+    linkInput.value = btn.dataset.url;
+    linkForm.requestSubmit();
+  });
+});
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+});
+
+installBtn?.addEventListener('click', async () => {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  installBanner?.classList.add('hidden');
+});
+
+installDismiss?.addEventListener('click', () => {
+  localStorage.setItem('flashread-install-dismissed', '1');
+  installBanner?.classList.add('hidden');
+});
+
+if (localStorage.getItem('flashread-used')) {
+  examplesEl?.classList.add('hidden');
+}
 
 renderRecents();
 checkResume();
