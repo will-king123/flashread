@@ -1,4 +1,4 @@
-const CACHE = 'flashread-v4';
+const CACHE = 'quickread-v5';
 const PRECACHE = ['/', '/index.html', '/app.js', '/analytics.js', '/styles.css', '/favicon.svg', '/icon-192.png', '/icon-512.png', '/manifest.json', '/og-image.svg', '/privacy.html'];
 
 self.addEventListener('install', (event) => {

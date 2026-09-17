@@ -28,6 +28,20 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+(function migrateLegacyStorage() {
+  const legacy = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key?.startsWith('flashread-')) legacy.push(key);
+  }
+  for (const key of legacy) {
+    const next = key.replace(/^flashread-/, 'quickread-');
+    if (localStorage.getItem(next) == null) {
+      localStorage.setItem(next, localStorage.getItem(key));
+    }
+  }
+})();
+
 async function apiFetch(url, options, retries = 2) {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
@@ -50,13 +64,13 @@ async function apiFetch(url, options, retries = 2) {
 }
 
 function markUsed() {
-  localStorage.setItem('flashread-used', '1');
+  localStorage.setItem('quickread-used', '1');
   document.getElementById('examples')?.classList.add('hidden');
 }
 
 function maybeShowInstallNudge() {
   if (!deferredInstallPrompt) return;
-  if (localStorage.getItem('flashread-install-dismissed')) return;
+  if (localStorage.getItem('quickread-install-dismissed')) return;
   if (window.matchMedia('(display-mode: standalone)').matches) return;
   document.getElementById('installBanner')?.classList.remove('hidden');
 }
@@ -258,6 +272,11 @@ const examplesEl = document.getElementById('examples');
 const installBanner = document.getElementById('installBanner');
 const installBtn = document.getElementById('installBtn');
 const installDismiss = document.getElementById('installDismiss');
+const wpmNudge = document.getElementById('wpmNudge');
+const wpmNudgeStart = document.getElementById('wpmNudgeStart');
+const wpmNudgeDismiss = document.getElementById('wpmNudgeDismiss');
+const wpmFinderTry = document.getElementById('wpmFinderTry');
+const WPM_DEMO_URL = 'https://en.wikipedia.org/wiki/Speed_reading';
 
 function syncReaderHeader() {
   backToSelect.classList.toggle('hidden', readerPanel.classList.contains('hidden'));
@@ -409,7 +428,7 @@ function rgba(hex, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-let currentAccent = localStorage.getItem('flashread-accent') || 'terracotta';
+let currentAccent = localStorage.getItem('quickread-accent') || 'terracotta';
 
 function applyAccent(name) {
   if (!ACCENTS[name]) name = 'terracotta';
@@ -426,17 +445,17 @@ function applyAccent(name) {
   document.querySelectorAll('.accent-swatch').forEach(btn => {
     btn.setAttribute('aria-pressed', btn.dataset.accent === name ? 'true' : 'false');
   });
-  localStorage.setItem('flashread-accent', name);
+  localStorage.setItem('quickread-accent', name);
 }
 
-const savedTheme = localStorage.getItem('flashread-theme') || 'light';
+const savedTheme = localStorage.getItem('quickread-theme') || 'light';
 document.documentElement.setAttribute('data-theme', savedTheme);
 applyAccent(currentAccent);
 
 themeToggle.addEventListener('click', () => {
   const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
   document.documentElement.setAttribute('data-theme', next);
-  localStorage.setItem('flashread-theme', next);
+  localStorage.setItem('quickread-theme', next);
   applyAccent(currentAccent);
 });
 
@@ -551,7 +570,7 @@ function setWpm(value) {
 // Recent links
 function getRecents() {
   try {
-    return JSON.parse(localStorage.getItem('flashread-recents') || '[]');
+    return JSON.parse(localStorage.getItem('quickread-recents') || '[]');
   } catch {
     return [];
   }
@@ -560,7 +579,7 @@ function getRecents() {
 function saveRecent(url, title) {
   const recents = getRecents().filter(r => r.url !== url);
   recents.unshift({ url, title, date: Date.now() });
-  localStorage.setItem('flashread-recents', JSON.stringify(recents.slice(0, 5)));
+  localStorage.setItem('quickread-recents', JSON.stringify(recents.slice(0, 5)));
   renderRecents();
 }
 
@@ -603,16 +622,16 @@ function saveSession() {
     session.pdfEndPage = parseInt(pageTo.value, 10);
     session.totalPages = loadedContent.totalPages;
   }
-  localStorage.setItem('flashread-session', JSON.stringify(session));
+  localStorage.setItem('quickread-session', JSON.stringify(session));
 }
 
 function clearSession() {
-  localStorage.removeItem('flashread-session');
+  localStorage.removeItem('quickread-session');
 }
 
 function checkResume() {
   try {
-    const session = JSON.parse(localStorage.getItem('flashread-session') || 'null');
+    const session = JSON.parse(localStorage.getItem('quickread-session') || 'null');
     if (!session || session.index <= 0) return;
     resumeTitle.textContent = session.title;
     resumeBanner.classList.remove('hidden');
@@ -708,7 +727,7 @@ focalToggle.addEventListener('change', () => {
 
 sentencePauseToggle.addEventListener('change', () => {
   sentencePauseEnabled = sentencePauseToggle.checked;
-  localStorage.setItem('flashread-sentence-pause', sentencePauseEnabled ? '1' : '0');
+  localStorage.setItem('quickread-sentence-pause', sentencePauseEnabled ? '1' : '0');
   if (isPlaying) restartTimer();
 });
 
@@ -719,7 +738,7 @@ function formatFontSize(value) {
 function setFontSize(value) {
   fontSize = Math.max(FONT_SIZE_MIN, Math.min(FONT_SIZE_MAX, value));
   document.documentElement.style.setProperty('--reader-font-size', String(fontSize));
-  localStorage.setItem('flashread-font-size', String(fontSize));
+  localStorage.setItem('quickread-font-size', String(fontSize));
   if (fontSlider) {
     fontSlider.value = fontSize;
     fontSlider.setAttribute('aria-valuenow', fontSize);
@@ -796,14 +815,14 @@ linkForm.addEventListener('submit', async (e) => {
     saveRecent(input, data.title);
     markUsed();
     showSelectPanel(data);
-    flashreadTrack('fetch_success', { type: data.type });
+    quickreadTrack('fetch_success', { type: data.type });
   } catch (err) {
     const msg = err.message === 'Failed to fetch'
       ? (location.hostname === 'localhost'
         ? "Can't reach the app — run npm run dev and open http://localhost:3000"
         : "Can't reach the server — check your connection and try again")
       : err.message;
-    flashreadTrack('fetch_error', { reason: msg });
+    quickreadTrack('fetch_error', { reason: msg });
     setStatus(msg, true);
   } finally {
     setLoading(false);
@@ -939,6 +958,19 @@ function updateTimeEstimate() {
   timeEstimate.textContent = `~${formatTime(estimateReadingSeconds(w, wpm))} at ${wpm} WPM`;
 }
 
+function updateShareLinkHint() {
+  if (!currentUrl || !loadedContent?.sections?.length) {
+    shareLinkBtn.textContent = 'Copy link';
+    shareLinkBtn.classList.remove('share-link-highlight');
+    return;
+  }
+  const total = loadedContent.sections.length;
+  const checked = sectionList.querySelectorAll('input:checked').length;
+  const partial = checked > 0 && checked < total;
+  shareLinkBtn.textContent = partial ? 'Copy link to share' : 'Copy link';
+  shareLinkBtn.classList.toggle('share-link-highlight', partial);
+}
+
 function updateWordCount() {
   const text = getSelectedText();
   const n = countWords(text);
@@ -946,6 +978,7 @@ function updateWordCount() {
   startBtn.disabled = n === 0;
   startBtn.textContent = canResumeReading(text) ? 'Continue reading' : 'Start reading';
   updateTimeEstimate();
+  updateShareLinkHint();
 }
 
 function updateTimeLeft() {
@@ -995,6 +1028,8 @@ function showSelectPanel(data) {
     renderSections(data.sections);
     if (pendingDeepLink?.section) applyDeepLinkSections(pendingDeepLink.section);
     updatePreview(data.text);
+    sectionPicker.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    quickreadTrack('sections_shown', { count: data.sections.length });
   } else if (data.type !== 'pdf') {
     updatePreview(data.text);
   }
@@ -1223,7 +1258,7 @@ function finish() {
   setFocusMode(false);
   invalidateSavedProgress();
   clearSession();
-  flashreadTrack('read_finish', { words: words.length, wpm, type: loadedContent?.type || 'text' });
+  quickreadTrack('read_finish', { words: words.length, wpm, type: loadedContent?.type || 'text' });
   maybeShowInstallNudge();
 }
 
@@ -1269,7 +1304,7 @@ function startReading() {
   renderWord();
   updateProgress();
 
-  flashreadTrack('read_start', { words: words.length, type: loadedContent?.type || 'text' });
+  quickreadTrack('read_start', { words: words.length, type: loadedContent?.type || 'text' });
 
   if (resume) {
     saveSession();
@@ -1366,9 +1401,9 @@ async function handleFile(file) {
       pdfWordsPerPage = countWords(data.text) / (data.endPage - data.startPage + 1);
       updatePdfEstimate();
       setStatus('');
-      flashreadTrack('fetch_success', { type: 'pdf', source: 'upload' });
+      quickreadTrack('fetch_success', { type: 'pdf', source: 'upload' });
     } catch (err) {
-      flashreadTrack('fetch_error', { reason: err.message });
+      quickreadTrack('fetch_error', { reason: err.message });
       setStatus(err.message, true);
     }
     return;
@@ -1546,6 +1581,11 @@ function finishCalTest(finalWpm) {
 }
 
 findWpmBtn.addEventListener('click', showWpmFinder);
+wpmNudgeStart?.addEventListener('click', showWpmFinder);
+wpmNudgeDismiss?.addEventListener('click', () => {
+  localStorage.setItem('quickread-wpm-nudge-dismissed', '1');
+  wpmNudge?.classList.add('hidden');
+});
 
 wpmFinderBack.addEventListener('click', () => {
   stopCalTest();
@@ -1557,13 +1597,33 @@ wpmFinderStart.addEventListener('click', startCalTest);
 
 wpmFinderStop.addEventListener('click', () => finishCalTest(calWpm));
 
-wpmFinderUse.addEventListener('click', () => {
+function applyFinderSpeed() {
   const speed = parseInt(finderScore.textContent, 10);
   setWpm(speed);
-  localStorage.setItem('flashread-wpm', speed);
+  localStorage.setItem('quickread-wpm', String(speed));
+  localStorage.setItem('quickread-wpm-calibrated', '1');
+  wpmNudge?.classList.add('hidden');
+  return speed;
+}
+
+function tryDemoArticle() {
+  markUsed();
+  linkInput.value = WPM_DEMO_URL;
+  linkForm.requestSubmit();
+}
+
+wpmFinderUse.addEventListener('click', () => {
+  applyFinderSpeed();
   stopCalTest();
   hideAllPanels();
   inputPanel.classList.remove('hidden');
+});
+
+wpmFinderTry.addEventListener('click', () => {
+  applyFinderSpeed();
+  stopCalTest();
+  hideAllPanels();
+  tryDemoArticle();
 });
 
 wpmFinderRetry.addEventListener('click', () => {
@@ -1572,16 +1632,16 @@ wpmFinderRetry.addEventListener('click', () => {
 });
 
 // Init
-const savedWpm = localStorage.getItem('flashread-wpm');
+const savedWpm = localStorage.getItem('quickread-wpm');
 if (savedWpm) setWpm(parseInt(savedWpm, 10));
 
-const savedSentencePause = localStorage.getItem('flashread-sentence-pause');
+const savedSentencePause = localStorage.getItem('quickread-sentence-pause');
 if (savedSentencePause !== null) {
   sentencePauseEnabled = savedSentencePause === '1';
   sentencePauseToggle.checked = sentencePauseEnabled;
 }
 
-const savedFontSize = localStorage.getItem('flashread-font-size');
+const savedFontSize = localStorage.getItem('quickread-font-size');
 if (savedFontSize) {
   fontSlider.value = savedFontSize;
   setFontSize(parseFloat(savedFontSize));
@@ -1625,12 +1685,21 @@ installBtn?.addEventListener('click', async () => {
 });
 
 installDismiss?.addEventListener('click', () => {
-  localStorage.setItem('flashread-install-dismissed', '1');
+  localStorage.setItem('quickread-install-dismissed', '1');
   installBanner?.classList.add('hidden');
 });
 
-if (localStorage.getItem('flashread-used')) {
+if (localStorage.getItem('quickread-used')) {
   examplesEl?.classList.add('hidden');
+}
+
+if (
+  wpmNudge
+  && !localStorage.getItem('quickread-wpm-calibrated')
+  && !localStorage.getItem('quickread-wpm-nudge-dismissed')
+  && !localStorage.getItem('quickread-wpm')
+) {
+  wpmNudge.classList.remove('hidden');
 }
 
 renderRecents();
@@ -1646,7 +1715,7 @@ if (pendingDeepLink?.url) {
   linkForm.requestSubmit();
 }
 
-flashreadTrack('page_view');
+quickreadTrack('page_view');
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});

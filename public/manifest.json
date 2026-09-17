@@ -1,6 +1,6 @@
 {
-  "name": "Flashread",
-  "short_name": "Flashread",
+  "name": "Quickread",
+  "short_name": "Quickread",
   "description": "Paste a link. Pick what to read. Speed read one word at a time.",
   "start_url": "/",
   "display": "standalone",

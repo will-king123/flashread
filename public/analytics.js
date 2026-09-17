@@ -1,4 +1,4 @@
-function flashreadTrack(event, detail = {}) {
+function quickreadTrack(event, detail = {}) {
   if (!event || typeof event !== 'string') return;
   fetch('/api/event', {
     method: 'POST',

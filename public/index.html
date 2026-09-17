@@ -3,17 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Flashread — speed read any article or PDF</title>
-  <meta name="description" content="Paste a link or upload a file. Pick sections, set your speed, and read one word at a time.">
-  <meta property="og:title" content="Flashread — speed read any article or PDF">
-  <meta property="og:description" content="Paste a link or upload a file. Pick sections, set your speed, and read one word at a time.">
+  <title>Quickread — pick sections, speed read the rest</title>
+  <meta name="description" content="Paste a link or PDF. Pick the sections you care about. Read them one word at a time in your browser — no account.">
+  <meta property="og:title" content="Quickread — pick sections, speed read the rest">
+  <meta property="og:description" content="Paste a link or PDF. Pick the sections you care about. Read them one word at a time in your browser.">
   <meta property="og:type" content="website">
   <meta property="og:image" content="/og-image.svg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Flashread">
-  <meta name="twitter:description" content="Speed read Wikipedia, articles, and PDFs in your browser.">
+  <meta name="twitter:title" content="Quickread">
+  <meta name="twitter:description" content="Pick the sections you need from Wikipedia, articles, and PDFs. Speed read them in your browser.">
   <meta name="twitter:image" content="/og-image.svg">
   <meta name="theme-color" content="#c45d3e">
   <link rel="canonical" href="/">
@@ -32,7 +32,7 @@
         <button class="btn btn-icon btn-sm header-back hidden" id="backToSelect" aria-label="Back to selection">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
         </button>
-        <h1 class="logo">Flashread</h1>
+        <h1 class="logo">Quickread</h1>
       </div>
       <div class="header-actions">
         <div class="settings-wrap">
@@ -67,19 +67,27 @@
     <main>
       <!-- Step 1: Input -->
       <section class="panel" id="inputPanel">
-        <p class="tagline">Paste a link. Pick what to read. Done.</p>
+        <p class="tagline">Don't read the whole page. Pick the sections you need.</p>
+
+        <div class="wpm-nudge hidden" id="wpmNudge">
+          <p class="wpm-nudge-text">First time? Find your reading speed in 30 seconds.</p>
+          <div class="wpm-nudge-actions">
+            <button type="button" class="btn btn-primary btn-sm" id="wpmNudgeStart">Find my speed</button>
+            <button type="button" class="btn btn-text btn-sm" id="wpmNudgeDismiss">Skip</button>
+          </div>
+        </div>
 
         <div class="examples" id="examples">
           <p class="examples-label">Try an example</p>
           <div class="example-chips">
-            <button type="button" class="example-chip" data-url="https://en.wikipedia.org/wiki/Speed_reading">Wikipedia article</button>
+            <button type="button" class="example-chip" data-url="https://en.wikipedia.org/wiki/Speed_reading">Wikipedia — pick sections</button>
             <button type="button" class="example-chip" data-url="https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf">Sample PDF</button>
             <button type="button" class="example-chip" data-example="text">Paste sample text</button>
           </div>
         </div>
 
         <div class="install-banner hidden" id="installBanner">
-          <p class="install-text">Add Flashread to your home screen for quick access.</p>
+          <p class="install-text">Add Quickread to your home screen for quick access.</p>
           <div class="install-actions">
             <button type="button" class="btn btn-primary btn-sm" id="installBtn">Install</button>
             <button type="button" class="btn btn-text btn-sm" id="installDismiss">Not now</button>
@@ -152,6 +160,7 @@
           <p class="finder-score"><span id="finderScore">350</span> WPM</p>
           <p class="finder-desc">Use this as your default reading speed?</p>
           <button class="btn btn-primary btn-start" id="wpmFinderUse">Use this speed</button>
+          <button class="btn btn-secondary btn-start" id="wpmFinderTry">Try it on an article</button>
           <button class="btn btn-text" id="wpmFinderRetry">Try again</button>
         </div>
       </section>
@@ -162,7 +171,7 @@
           <button class="btn btn-text back-link" id="backToInput">← New link</button>
           <div class="select-title-row">
             <h2 class="doc-title" id="docTitle"></h2>
-            <button type="button" class="btn btn-text btn-sm share-link-btn hidden" id="shareLinkBtn">Copy link</button>
+            <button type="button" class="btn btn-text btn-sm share-link-btn hidden" id="shareLinkBtn" title="Share this URL with your section picks">Copy link</button>
           </div>
         </div>
 
@@ -178,6 +187,20 @@
             <p class="hint" id="pdfStatus">Loading pages…</p>
           </div>
 
+          <div class="select-card section-picker hidden" id="sectionPicker">
+            <div class="section-picker-head">
+              <div>
+                <p class="field-label">Sections to read</p>
+                <p class="section-picker-hint">Uncheck what you don't need — or hit Read → on one section.</p>
+              </div>
+              <div class="picker-actions">
+                <button type="button" class="btn btn-text btn-sm" id="selectAllBtn">All</button>
+                <button type="button" class="btn btn-text btn-sm" id="selectNoneBtn">None</button>
+              </div>
+            </div>
+            <ul class="section-list" id="sectionList"></ul>
+          </div>
+
           <div class="select-card select-speed">
             <div class="speed-header">
               <span class="field-label">Speed</span>
@@ -190,15 +213,6 @@
               <button type="button" class="preset" data-wpm="500">500</button>
             </div>
           </div>
-
-          <details class="select-sections section-picker hidden" id="sectionPicker">
-            <summary>Choose which sections to read</summary>
-            <div class="picker-actions">
-              <button class="btn btn-text btn-sm" id="selectAllBtn">All</button>
-              <button class="btn btn-text btn-sm" id="selectNoneBtn">None</button>
-            </div>
-            <ul class="section-list" id="sectionList"></ul>
-          </details>
 
           <details class="select-more">
             <summary>More options</summary>

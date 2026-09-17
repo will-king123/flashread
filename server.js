@@ -1,4 +1,4 @@
-console.log('[flashread] starting…');
+console.log('[quickread] starting…');
 import express from 'express';
 import { fileURLToPath } from 'url';
 import path from 'path';
@@ -228,7 +228,7 @@ async function fetchUrl(url) {
   try {
     response = await fetch(url, {
       headers: {
-        'User-Agent': `Mozilla/5.0 (compatible; Flashread/1.0; +${SITE_URL})`,
+        'User-Agent': `Mozilla/5.0 (compatible; Quickread/1.0; +${SITE_URL})`,
         Accept: 'text/html,application/xhtml+xml,application/pdf,*/*;q=0.8',
       },
       redirect: 'follow',
@@ -386,5 +386,5 @@ process.on('uncaughtException', (err) => console.error('uncaughtException:', err
 process.on('unhandledRejection', (err) => console.error('unhandledRejection:', err));
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Flashread running on port ${PORT}`);
+  console.log(`Quickread running on port ${PORT}`);
 });
