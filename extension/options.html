@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quickread extension settings</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 2rem auto; padding: 0 1rem; color: #3a3632; }
+    label { display: block; font-weight: 600; margin-bottom: 0.5rem; }
+    input { width: 100%; padding: 0.625rem 0.75rem; border: 1px solid #ddd6cb; border-radius: 8px; font: inherit; }
+    p { color: #7a746b; font-size: 0.875rem; line-height: 1.5; }
+    button { margin-top: 1rem; padding: 0.625rem 1rem; border: none; border-radius: 8px; background: #c45d3e; color: #fff; font: inherit; cursor: pointer; }
+    .saved { color: #5c8a6e; font-size: 0.875rem; margin-top: 0.75rem; min-height: 1.25rem; }
+  </style>
+</head>
+<body>
+  <h1>Quickread</h1>
+  <p>Where the extension opens articles and selections.</p>
+  <form id="form">
+    <label for="appUrl">Quickread app URL</label>
+    <input id="appUrl" type="url" required placeholder="https://flashread-live.onrender.com">
+    <button type="submit">Save</button>
+    <p class="saved" id="status"></p>
+  </form>
+  <script src="options.js"></script>
+</body>
+</html>

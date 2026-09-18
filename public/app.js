@@ -298,6 +298,16 @@ function parseDeepLink() {
   };
 }
 
+function parseTextDeepLink() {
+  const p = new URLSearchParams(location.search);
+  const text = p.get('text')?.trim();
+  if (!text) return null;
+  return {
+    title: p.get('title')?.trim() || 'Selected text',
+    text,
+  };
+}
+
 function applyDeepLinkPages(pagesParam) {
   const m = pagesParam?.match(/^(\d+)-(\d+)$/);
   if (!m) return;
@@ -1706,13 +1716,25 @@ renderRecents();
 checkResume();
 
 pendingDeepLink = parseDeepLink();
+const textImport = parseTextDeepLink();
+const launchSource = new URLSearchParams(location.search).get('source');
+
 if (pendingDeepLink?.wpm) {
   const savedSpeed = parseInt(pendingDeepLink.wpm, 10);
   if (savedSpeed >= 100 && savedSpeed <= 1000) setWpm(savedSpeed);
 }
-if (pendingDeepLink?.url) {
+
+if (textImport) {
+  markUsed();
+  history.replaceState(null, '', location.pathname);
+  showSelectPanel({ type: 'text', title: textImport.title, text: textImport.text, sections: [] });
+} else if (pendingDeepLink?.url) {
   linkInput.value = pendingDeepLink.url;
   linkForm.requestSubmit();
+}
+
+if (launchSource === 'extension') {
+  quickreadTrack('extension_open', { via: textImport ? 'text' : 'url' });
 }
 
 quickreadTrack('page_view');
