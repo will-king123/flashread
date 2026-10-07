@@ -1,4 +1,4 @@
-const DEFAULT_APP_URL = 'https://flashread-live.onrender.com';
+const DEFAULT_APP_URL = 'https://quickread-live.onrender.com';
 const MAX_SELECTION_CHARS = 12000;
 
 async function getAppUrl() {

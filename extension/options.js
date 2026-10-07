@@ -1,4 +1,4 @@
-const DEFAULT_APP_URL = 'https://flashread-live.onrender.com';
+const DEFAULT_APP_URL = 'https://quickread-live.onrender.com';
 const appUrlInput = document.getElementById('appUrl');
 const statusEl = document.getElementById('status');
 

@@ -1,4 +1,4 @@
-app = 'flashread'
+app = 'quickread'
 primary_region = 'lhr'
 
 [build]

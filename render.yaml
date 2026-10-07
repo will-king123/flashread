@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: flashread-live
+    name: quickread-live
     runtime: docker
     plan: free
     repo: https://github.com/will-king123/flashread
