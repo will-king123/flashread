@@ -9,7 +9,7 @@ async function getAppUrl() {
 function openQuickread(params) {
   getAppUrl().then((base) => {
     params.set('source', 'extension');
-    chrome.tabs.create({ url: `${base}/?${params.toString()}` });
+    chrome.tabs.create({ url: `${base}/app?${params.toString()}` });
   });
 }
 

@@ -7,9 +7,11 @@ let finishTimer = null;
 let wpm = 300;
 let focalEnabled = true;
 let sentencePauseEnabled = true;
-let fontSize = 3.5;
-const FONT_SIZE_MIN = 2;
-const FONT_SIZE_MAX = 6;
+let fontSize = 2.5;
+const FONT_SIZE_MIN = 1;
+const FONT_SIZE_MAX = 4;
+const FONT_SIZE_DEFAULT = 2.5;
+const FONT_SIZE_PX_PER_REM = 20;
 let loadedContent = null;
 let manualSelection = '';
 let currentUrl = '';
@@ -22,7 +24,7 @@ let touchStartX = 0;
 let savedProgress = null;
 let deferredInstallPrompt = null;
 
-const SAMPLE_TEXT = 'Speed reading works by presenting one word at a time at a fixed point on screen. Your eyes stay still while the words come to you. This cuts out the time spent moving your eyes across lines and reduces regressions — those moments when you jump back to re-read something.';
+const SAMPLE_TEXT = 'Speed reading works by presenting one word at a time at a fixed point on screen. Your eyes stay still while the words come to you. This cuts out the time spent moving your eyes across lines and reduces regressions - those moments when you jump back to re-read something.';
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -42,6 +44,12 @@ function sleep(ms) {
   }
 })();
 
+// Browsers word an unreachable server differently: Chrome says "Failed to
+// fetch", Safari "Load failed", Firefox "NetworkError when attempting...".
+function isNetworkError(err) {
+  return err instanceof TypeError || /failed to fetch|load failed|networkerror/i.test(err.message || '');
+}
+
 async function apiFetch(url, options, retries = 2) {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
@@ -53,8 +61,10 @@ async function apiFetch(url, options, retries = 2) {
       }
       return res;
     } catch (err) {
+      // A thrown fetch means we never reached the server at all, which is a
+      // different problem from a cold start behind a 502.
       if (attempt < retries) {
-        setStatus('Server waking up… retrying', false);
+        setStatus('Can\u2019t reach the server\u2026 retrying', false);
         await sleep(2000 * (attempt + 1));
         continue;
       }
@@ -80,6 +90,7 @@ let calWpm = 250;
 let calTimer = null;
 let calLevelTimer = null;
 let calRunning = false;
+let calCurrentWord = '';
 const CAL_WPM_START = 250;
 const CAL_WPM_MAX = 1000;
 const CAL_WPM_STEP = 50;
@@ -116,63 +127,276 @@ function pickCalPhrase(pool) {
   return phrase;
 }
 
-function calPercentilePhrases(speed) {
-  const pct = wpmToPercentile(speed);
-  return [
-    `At this pace you're already faster than about ${pct} percent of people`,
-    `Most adults land somewhere between two hundred and three hundred words a minute`,
-    `Only a small fraction of people sustain five hundred with full comprehension`,
-    `Researchers reckon the average silent reading speed is two hundred and thirty eight`,
-    `People almost always think they read faster than they actually do`,
-  ];
-}
+// One scripted block per speed level. Each block is written to run slightly
+// longer than CAL_LEVEL_MS at its own speed, so a level never runs dry.
+const CAL_SCRIPT = {
+  250: [
+    `You're reading at 250 words a minute right now`,
+    `That's the speed the average adult reads silently`,
+    `Most people never find out their own number`,
+    `You're about to`,
+    `Every ten seconds this gets 50 words a minute faster`,
+    `Stop when the words stop making sense`,
+  ],
+  300: [
+    `300 words a minute`,
+    `Slightly above average and you've barely started`,
+    `The voice in your head reading these words is called subvocalization`,
+    `Almost everyone has it and it caps you around 400`,
+    `Getting past that means trusting your eyes instead of your ear`,
+    `At this pace a 300 page novel takes about five hours`,
+  ],
+  350: [
+    `350 words a minute`,
+    `You are now faster than roughly three quarters of readers`,
+    `Normal reading wastes time on eye movement`,
+    `Your eyes jump about four times a second and each jump costs you`,
+    `One word in one place removes all of that`,
+    `That's why this feels easier than it should`,
+    `The technique has a name rapid serial visual presentation`,
+  ],
+  400: [
+    `400 words a minute`,
+    `This is the ceiling for most adults reading normally`,
+    `You are past it`,
+    `Roughly one reader in six can hold this pace`,
+    `Speed reading courses have promised thousands of words a minute for a century`,
+    `The honest number is that comprehension starts slipping somewhere above 500`,
+    `Nobody has beaten that with a trick`,
+    `They just practise`,
+    `You are practising right now without meaning to`,
+  ],
+  450: [
+    `450 words a minute`,
+    `Nine out of ten people cannot read this fast`,
+    `You are still following so your brain is keeping up`,
+    `Here is the strange part`,
+    `Reading silently was once considered unusual`,
+    `For centuries almost everyone read out loud`,
+    `Monks in medieval libraries murmured their way through every page`,
+    `Silent reading only became normal a few hundred years ago`,
+    `Which means this speed is a very recent human ability`,
+    `You are using it now`,
+  ],
+  500: [
+    `500 words a minute`,
+    `This is the line most people cannot cross`,
+    `You are in the top ten percent of readers`,
+    `Twice the speed of the average adult`,
+    `At 500 you finish a full novel in about three hours`,
+    `A long news article takes under two minutes`,
+    `Your email backlog becomes an afternoon not a week`,
+    `Warren Buffett reportedly reads 500 pages a day`,
+    `He is not reading faster than this`,
+    `He just never stops`,
+    `Time and speed are different problems`,
+    `You are solving the second one`,
+  ],
+  550: [
+    `550 words a minute`,
+    `You are now in rare territory`,
+    `Fewer than one reader in twenty sustains this`,
+    `Notice what is happening to the words`,
+    `You are not sounding them out any more`,
+    `You are recognising whole shapes`,
+    `That is how fluent readers handle familiar words`,
+    `The letters never get spelled out in your head`,
+    `The shape arrives and the meaning follows`,
+    `It is closer to recognising a face than decoding a code`,
+    `Short words like this go past almost free`,
+    `Long ones are what slow you down`,
+    `That is why we hold the longer words a fraction longer`,
+  ],
+  600: [
+    `600 words a minute`,
+    `This is where most people lose the thread`,
+    `If you are still here you are in the top three percent`,
+    `Something to know about comprehension`,
+    `It does not collapse all at once`,
+    `It fades`,
+    `You keep catching individual words while the sentence stops landing`,
+    `That is the signal to stop`,
+    `Not the moment the words blur`,
+    `The moment the meaning does`,
+    `Fiction holds up better than anything else at speed`,
+    `Shorter words and you already know where the story is going`,
+    `A dense technical paper at 600 is mostly decoration`,
+    `Match the speed to the text and you get the best of both`,
+  ],
+  650: [
+    `650 words a minute`,
+    `Two readers in a hundred get this far`,
+    `Your eyes have not moved for nearly a minute`,
+    `That is the whole trick`,
+    `In a book your eyes travel the length of every line`,
+    `Then snap back to the start of the next one`,
+    `Then jump backwards whenever you lose your place`,
+    `Those backward jumps are called regressions`,
+    `Ordinary readers make them on roughly one word in six`,
+    `Here there is nowhere to jump back to`,
+    `The word is gone and the next one is already in the same spot`,
+    `You are reading forwards only`,
+    `Most of the speed you are feeling comes from that alone`,
+  ],
+  700: [
+    `700 words a minute`,
+    `You are faster than 99 readers in a hundred`,
+    `Worth saying plainly`,
+    `This is not a lab measurement`,
+    `It is a decent estimate from a short test`,
+    `Tomorrow you might land 50 either side`,
+    `What is real is the range you are comfortable in`,
+    `That range moves with practice`,
+    `Reading speed is not fixed like height`,
+    `It behaves more like pace on a run`,
+    `Push a little past comfortable and comfortable moves`,
+    `People who read at speed every day gain a hundred words a minute in a few weeks`,
+    `Then it plateaus and you have to push again`,
+    `Same as any other skill you have ever trained`,
+    `The number is not the point the habit is`,
+  ],
+  750: [
+    `750 words a minute`,
+    `Very few people read here and keep meaning`,
+    `Check yourself honestly`,
+    `Are you still understanding or just seeing`,
+    `There is a real difference and it is easy to miss`,
+    `Seeing words feels like reading for a while`,
+    `Then you reach the end and cannot say what it said`,
+    `Researchers have tested this for decades`,
+    `Speed and comprehension trade against each other`,
+    `Past a point you are buying time with understanding`,
+    `Where that point sits is personal`,
+    `Some people hold 600 with everything intact`,
+    `Others start losing it at 400`,
+    `Neither is better`,
+    `Knowing your own number is what saves you time`,
+    `Because you can stop guessing and just set it`,
+    `That is what this test is for`,
+    `Nothing more clever than that`,
+  ],
+  800: [
+    `800 words a minute`,
+    `You are in the territory of trained speed readers`,
+    `Championship competitors claim numbers far past this`,
+    `A few claim thousands`,
+    `When tested on comprehension the claims mostly fall apart`,
+    `One famous champion claimed 25 thousand words a minute`,
+    `Under examination she was skimming and guessing well`,
+    `Skimming is a genuine skill and worth having`,
+    `It is just not reading`,
+    `Reading means the sentences arrive whole`,
+    `So here is a fair question for you`,
+    `Are these sentences arriving whole`,
+    `If yes keep going`,
+    `If no you found your ceiling and that is the answer you came for`,
+    `There is no prize for a bigger number you cannot use`,
+    `The useful speed is the fastest one you would pick for a real article`,
+    `Not the fastest you can survive`,
+    `Those are two different things`,
+  ],
+  850: [
+    `850 words a minute`,
+    `Fourteen words a second`,
+    `Your brain is getting a new word every 70 milliseconds`,
+    `That is faster than most people can blink on purpose`,
+    `The limit now is not your eyes`,
+    `Your eyes are fine they are barely working`,
+    `The limit is the part of your brain that turns shapes into meaning`,
+    `It needs roughly a quarter of a second per word to do that properly`,
+    `Which puts a hard mathematical ceiling somewhere near here`,
+    `You can go faster than the ceiling`,
+    `You just stop reading when you do`,
+    `Some words still get through`,
+    `Names numbers anything you were already looking for`,
+    `That is how skimming works and it is genuinely useful`,
+    `But the sentence as a whole is gone`,
+    `Three more levels after this one`,
+    `Most people never see them`,
+    `Stop whenever you like the test has already worked`,
+  ],
+  900: [
+    `900 words a minute`,
+    `Fifteen words every second`,
+    `Honestly nobody reads at this speed`,
+    `If you are still pressing on you are testing your nerve not your reading`,
+    `Which is fine it is a fun thing to test`,
+    `Here is something to think about while the words fly past`,
+    `The average person reads about a dozen books a year`,
+    `At 400 words a minute that is roughly 50 hours`,
+    `At 250 it is closer to 80`,
+    `Thirty hours of your life for one setting on a slider`,
+    `Over a decade it is most of a working month`,
+    `That is the actual argument for knowing your speed`,
+    `Not the bragging`,
+    `The 30 hours`,
+    `Bill Gates gets through 50 books a year`,
+    `He is not superhuman he is consistent and he reads fast enough`,
+    `Both halves matter`,
+    `The same maths works for articles and reports and everything else you read`,
+    `Two levels left`,
+    `See how far you get`,
+  ],
+  950: [
+    `950 words a minute`,
+    `Sixteen words a second`,
+    `One level from the top`,
+    `Nobody is comfortable here and that is the point of the last few levels`,
+    `They exist to show you where your ceiling actually is`,
+    `A little more history while you hang on`,
+    `This one word at a time format is not new`,
+    `It was invented in the 1970s by psychologists studying how reading works`,
+    `They needed a way to control exactly how long a word stayed visible`,
+    `Feeding words one at a time was the simplest answer`,
+    `It was a lab instrument long before it was an app`,
+    `Which is why it is unusually well studied`,
+    `The findings are consistent`,
+    `It genuinely removes the eye movement cost`,
+    `It genuinely makes regressions impossible`,
+    `And it genuinely does not raise your comprehension ceiling`,
+    `You get the mechanical savings and nothing more`,
+    `That is still a real gain worth having`,
+    `Just not the miracle the courses sell`,
+    `Last level next`,
+  ],
+  1000: [
+    `1000 words a minute`,
+    `The last level`,
+    `Seventeen words a second and this is where the test ends`,
+    `If you are genuinely reading this you are one of a handful`,
+    `If you are watching words go by you are with everyone else and there is no shame in it`,
+    `Either way the test finishes when this passage runs out`,
+    `A few last things worth knowing`,
+    `The speed you stop at is your ceiling not your cruising pace`,
+    `Set your default about 50 to 100 below it`,
+    `That is where you can read comfortably for half an hour`,
+    `Come back in a month and take this again`,
+    `The number will have moved`,
+    `It always does`,
+    `One more thing about that voice in your head`,
+    `It never fully goes away`,
+    `Even at this speed some part of you is still saying the words`,
+    `It just stopped waiting for you to finish saying them`,
+    `That is the whole skill`,
+    `Letting the meaning run ahead of the voice`,
+    `Almost there`,
+    `Whatever number you land on it is yours`,
+    `Use it`,
+  ],
+};
 
-function calFactPhrases(speed) {
+function calFillerPhrases(speed) {
+  const pct = wpmToPercentile(speed);
   const pageSec = Math.max(1, Math.round((250 / speed) * 60));
   return [
-    `When you read silently there's a voice in your head saying every word`,
-    `That inner voice is called subvocalization and almost everyone does it`,
-    `Your eyes jumping across a page is another thing that eats up time`,
-    `One word at a time like this is called rapid serial visual presentation`,
-    `It sounds technical but the idea is dead simple`,
-    `No eye movement no scanning back and forth just one word appearing in the same spot`,
-    `Researchers say it's like switching from a crowded hallway to an empty one`,
-    `Your brain isn't juggling as many tasks so it can move faster`,
-    `Fiction reads faster than non-fiction because the words tend to be shorter`,
-    `Nobody reads terms and conditions at full speed and that's fine`,
+    `At this pace you are faster than about ${pct} percent of people`,
     `A novel page at this pace takes roughly ${pageSec} seconds`,
-    `Comprehension usually holds up until things get really quick`,
-    `Speed readers can push past five hundred but that's a different skill entirely`,
-    `The world speed reading record is somewhere above a thousand words a minute`,
-    `Bill Gates finishes about fifty books a year most people manage a handful`,
-    `Warren Buffett apparently reads five hundred pages a day`,
-    `Your reading speed isn't fixed you can train it like anything else`,
-    `Harry Potter gets progressively longer and people still binge the whole series`,
-    `That's the pull of a good story your brain wants the next word`,
+    `Fiction reads faster than non-fiction because the words are shorter`,
+    `Nobody reads terms and conditions at full speed and that is fine`,
+    `Your reading speed is not fixed you can train it like anything else`,
+    `People almost always think they read faster than they actually do`,
     `Academic papers are brutal because of the jargon and the footnotes`,
-    `Most people feel pretty comfortable around three hundred words a minute`,
-    `Then it bumps up and suddenly the words start turning into a blur`,
-    `Somewhere past six hundred is where most people lose the thread entirely`,
-  ];
-}
-
-function calSpeedupPhrases() {
-  return [
-    `Things pick up from here`,
-    `It gets quicker now`,
-    `A little faster`,
-    `The pace moves up`,
-    `Speed increases`,
-    `Here we go faster`,
-  ];
-}
-
-function calIntroPhrases() {
-  return [
-    `Most people have no idea how fast they actually read`,
-    `There's a whole science behind reading speed that most of us never think about`,
-    `Your brain can take in words much faster than your eyes usually allow`,
-    `Silent reading as we know it is only a few hundred years old`,
+    `Stop as soon as the meaning stops arriving`,
   ];
 }
 
@@ -180,25 +404,26 @@ function enqueueCalPhrase(phrase) {
   calWordQueue.push(...tokenize(phrase));
 }
 
-function refillCalQueue(speed) {
-  const pools = [calPercentilePhrases(speed), calFactPhrases(speed)];
-  const pool = pools[Math.floor(Math.random() * pools.length)];
-  enqueueCalPhrase(pickCalPhrase(pool));
+function calLevelLines(speed) {
+  return CAL_SCRIPT[speed] || CAL_SCRIPT[CAL_WPM_MAX];
 }
 
-function primeCalQueue(intro = false) {
+function refillCalQueue(speed) {
+  enqueueCalPhrase(pickCalPhrase(calFillerPhrases(speed)));
+}
+
+function loadCalLevel(speed) {
   calWordQueue = [];
+  for (const line of calLevelLines(speed)) enqueueCalPhrase(line);
+}
+
+function primeCalQueue() {
   calRecentPhrases = [];
-  if (intro) enqueueCalPhrase(pickCalPhrase(calIntroPhrases()));
-  refillCalQueue(calWpm);
-  refillCalQueue(calWpm);
+  loadCalLevel(calWpm);
 }
 
 function injectCalSpeedup() {
-  calWordQueue = [];
-  enqueueCalPhrase(pickCalPhrase(calSpeedupPhrases()));
-  refillCalQueue(calWpm);
-  refillCalQueue(calWpm);
+  loadCalLevel(calWpm);
 }
 
 // DOM
@@ -218,6 +443,8 @@ const resumeTitle = document.getElementById('resumeTitle');
 const resumeBtn = document.getElementById('resumeBtn');
 const dismissResume = document.getElementById('dismissResume');
 const historyWrap = document.getElementById('historyWrap');
+const recentToggle = document.getElementById('recentToggle');
+const recentMenu = document.getElementById('recentMenu');
 const recentList = document.getElementById('recentList');
 const backToInput = document.getElementById('backToInput');
 const docTitle = document.getElementById('docTitle');
@@ -244,6 +471,8 @@ const fileDrop = document.getElementById('fileDrop');
 const fileInput = document.getElementById('fileInput');
 const fileBrowseBtn = document.getElementById('fileBrowseBtn');
 const startBtn = document.getElementById('startBtn');
+const summaryToggle = document.getElementById('summaryToggle');
+const selectStatus = document.getElementById('selectStatus');
 const shareLinkBtn = document.getElementById('shareLinkBtn');
 const readerDisplay = document.getElementById('readerDisplay');
 const wordContainer = document.getElementById('wordContainer');
@@ -251,7 +480,6 @@ const finishOverlay = document.getElementById('finishOverlay');
 const finishStats = document.getElementById('finishStats');
 const readAgainBtn = document.getElementById('readAgainBtn');
 const continuePdfBtn = document.getElementById('continuePdfBtn');
-const fullscreenBtn = document.getElementById('fullscreenBtn');
 const progressBar = document.getElementById('progressBar');
 const progressFill = document.getElementById('progressFill');
 const progressText = document.getElementById('progressText');
@@ -272,9 +500,6 @@ const examplesEl = document.getElementById('examples');
 const installBanner = document.getElementById('installBanner');
 const installBtn = document.getElementById('installBtn');
 const installDismiss = document.getElementById('installDismiss');
-const wpmNudge = document.getElementById('wpmNudge');
-const wpmNudgeStart = document.getElementById('wpmNudgeStart');
-const wpmNudgeDismiss = document.getElementById('wpmNudgeDismiss');
 const wpmFinderTry = document.getElementById('wpmFinderTry');
 const WPM_DEMO_URL = 'https://en.wikipedia.org/wiki/Speed_reading';
 
@@ -397,8 +622,12 @@ const wpmFinderResult = document.getElementById('wpmFinderResult');
 const finderWpmLabel = document.getElementById('finderWpmLabel');
 const finderWordContainer = document.getElementById('finderWordContainer');
 const finderScore = document.getElementById('finderScore');
+const finderFact = document.getElementById('finderFact');
 const wpmFinderUse = document.getElementById('wpmFinderUse');
 const wpmFinderRetry = document.getElementById('wpmFinderRetry');
+const finderSettings = document.getElementById('finderSettings');
+const finderFontSlider = document.getElementById('finderFontSlider');
+const finderFontSizeValue = document.getElementById('finderFontSizeValue');
 
 // Theme & accent
 const ACCENTS = {
@@ -486,6 +715,11 @@ document.addEventListener('click', (e) => {
     settingsPopover.classList.add('hidden');
     settingsBtn.setAttribute('aria-expanded', 'false');
   }
+  if (!recentMenu.classList.contains('hidden') &&
+      !recentMenu.contains(e.target) &&
+      !recentToggle.contains(e.target)) {
+    closeRecentMenu();
+  }
 });
 
 // Helpers
@@ -554,6 +788,12 @@ function setStatus(msg, isError = false) {
   inputStatus.classList.toggle('error-msg', isError);
 }
 
+function setSelectStatus(msg, isError = false) {
+  if (!selectStatus) return;
+  selectStatus.textContent = msg;
+  selectStatus.classList.toggle('error-msg', isError);
+}
+
 function setLoading(loading) {
   goBtn.disabled = loading;
   goBtn.textContent = loading ? 'Loading…' : 'Go';
@@ -593,22 +833,38 @@ function saveRecent(url, title) {
   renderRecents();
 }
 
+function closeRecentMenu() {
+  recentMenu.classList.add('hidden');
+  recentToggle.setAttribute('aria-expanded', 'false');
+  recentToggle.classList.remove('recent-toggle-open');
+}
+
 function renderRecents() {
   const recents = getRecents();
   if (!recents.length) {
     historyWrap.classList.add('hidden');
+    closeRecentMenu();
     return;
   }
   historyWrap.classList.remove('hidden');
   recentList.innerHTML = recents.map(r =>
-    `<li><button class="recent-item" data-url="${escapeHtml(r.url)}">${escapeHtml(r.title || r.url)}</button></li>`
+    `<li><button type="button" class="recent-item" data-url="${escapeHtml(r.url)}">${escapeHtml(r.title || r.url)}</button></li>`
   ).join('');
 }
+
+recentToggle.addEventListener('click', (e) => {
+  e.stopPropagation();
+  recentMenu.classList.toggle('hidden');
+  const isOpen = !recentMenu.classList.contains('hidden');
+  recentToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  recentToggle.classList.toggle('recent-toggle-open', isOpen);
+});
 
 recentList.addEventListener('click', (e) => {
   const btn = e.target.closest('.recent-item');
   if (!btn) return;
   linkInput.value = btn.dataset.url;
+  closeRecentMenu();
   linkForm.requestSubmit();
 });
 
@@ -749,12 +1005,21 @@ function setFontSize(value) {
   fontSize = Math.max(FONT_SIZE_MIN, Math.min(FONT_SIZE_MAX, value));
   document.documentElement.style.setProperty('--reader-font-size', String(fontSize));
   localStorage.setItem('quickread-font-size', String(fontSize));
+  const sizeLabel = formatFontSize(fontSize);
   if (fontSlider) {
     fontSlider.value = fontSize;
     fontSlider.setAttribute('aria-valuenow', fontSize);
   }
-  if (fontSizeValue) fontSizeValue.textContent = formatFontSize(fontSize);
+  if (fontSizeValue) fontSizeValue.textContent = sizeLabel;
+  if (finderFontSlider) {
+    finderFontSlider.value = fontSize;
+    finderFontSlider.setAttribute('aria-valuenow', fontSize);
+  }
+  if (finderFontSizeValue) finderFontSizeValue.textContent = sizeLabel;
   if (words.length) renderWord();
+  if (calRunning && calCurrentWord) {
+    renderWordIn(finderWordContainer, calCurrentWord, true);
+  }
 }
 
 if (fontSlider) {
@@ -762,10 +1027,15 @@ if (fontSlider) {
   fontSlider.addEventListener('change', () => setFontSize(parseFloat(fontSlider.value)));
 }
 
+if (finderFontSlider) {
+  finderFontSlider.addEventListener('input', () => setFontSize(parseFloat(finderFontSlider.value)));
+  finderFontSlider.addEventListener('change', () => setFontSize(parseFloat(finderFontSlider.value)));
+}
+
 textToggle.addEventListener('click', () => {
   textFallback.classList.toggle('hidden');
   textToggle.textContent = textFallback.classList.contains('hidden')
-    ? 'Or paste text directly'
+    ? 'Paste text directly'
     : 'Hide text input';
 });
 
@@ -827,10 +1097,10 @@ linkForm.addEventListener('submit', async (e) => {
     showSelectPanel(data);
     quickreadTrack('fetch_success', { type: data.type });
   } catch (err) {
-    const msg = err.message === 'Failed to fetch'
+    const msg = isNetworkError(err)
       ? (location.hostname === 'localhost'
-        ? "Can't reach the app — run npm run dev and open http://localhost:3000"
-        : "Can't reach the server — check your connection and try again")
+        ? "Can't reach the app - run npm run dev and open http://localhost:3000/app"
+        : "Can't reach the server - check your connection and try again")
       : err.message;
     quickreadTrack('fetch_error', { reason: msg });
     setStatus(msg, true);
@@ -917,7 +1187,7 @@ sectionList.addEventListener('click', (e) => {
   manualSelection = '';
   invalidateSavedProgress();
   updateWordCount();
-  startReading();
+  void beginReadingFlow();
 });
 
 selectAllBtn.addEventListener('click', () => {
@@ -963,6 +1233,10 @@ function updateTimeEstimate() {
   const w = tokenize(getSelectedText());
   if (w.length === 0) {
     timeEstimate.textContent = '';
+    return;
+  }
+  if (summaryToggle?.checked && !manualSelection) {
+    timeEstimate.textContent = 'AI will shorten this before you read';
     return;
   }
   timeEstimate.textContent = `~${formatTime(estimateReadingSeconds(w, wpm))} at ${wpm} WPM`;
@@ -1024,6 +1298,7 @@ function showSelectPanel(data) {
   loadedContent = data;
   manualSelection = '';
   invalidateSavedProgress();
+  setSelectStatus('');
   docTitle.textContent = data.title;
 
   pdfPicker.classList.toggle('hidden', data.type !== 'pdf');
@@ -1060,7 +1335,7 @@ function showSelectPanel(data) {
   }
 
   if (shouldAutoStart(data) && countWords(getSelectedText()) > 0) {
-    startReading();
+    void beginReadingFlow();
   }
 }
 
@@ -1104,15 +1379,15 @@ function fitWordSize(container) {
   const display = container.closest('.reader-display');
   if (!display) return;
 
-  const maxPx = fontSize * 16;
-  const minPx = Math.max(12, fontSize * 8);
+  const desiredPx = fontSize * FONT_SIZE_PX_PER_REM;
   const available = display.clientWidth - 32;
-  container.style.fontSize = `${maxPx}px`;
+  container.style.transform = '';
+  container.style.fontSize = `${desiredPx}px`;
 
   if (available <= 0 || container.scrollWidth <= available) return;
 
-  let lo = minPx;
-  let hi = maxPx;
+  let lo = 12;
+  let hi = desiredPx;
   while (lo < hi) {
     const mid = Math.ceil((lo + hi) / 2);
     container.style.fontSize = `${mid}px`;
@@ -1120,18 +1395,23 @@ function fitWordSize(container) {
     else lo = mid;
   }
   container.style.fontSize = `${lo}px`;
+  if (desiredPx > lo) {
+    container.style.transform = `scale(${desiredPx / lo})`;
+  }
 }
 
 function renderWordIn(container, word, useFocal) {
   if (!word) {
     container.textContent = '';
     container.style.fontSize = '';
+    container.style.transform = '';
     return;
   }
 
   container.classList.toggle('no-focal', !useFocal);
   container.classList.remove('word-enter');
   container.style.fontSize = '';
+  container.style.transform = '';
   void container.offsetWidth;
   container.classList.add('word-enter');
 
@@ -1197,7 +1477,7 @@ function restartTimer() {
 function setFocusMode(on) {
   readerPanel.classList.toggle('focus-mode', on);
   appEl.classList.toggle('reading-focus', on);
-  readerDisplay.title = on ? 'Tap to pause' : 'Tap to play';
+  readerDisplay.title = on ? 'Tap or Space to pause' : 'Tap or Space to play';
 
   if (on) {
     readerDisplay.classList.remove('focus-expand');
@@ -1285,6 +1565,59 @@ function skip(delta) {
   if (isPlaying) restartTimer();
 }
 
+let lastReadWasSummary = false;
+
+async function summarizeIntoSelection(sourceText) {
+  setSelectStatus('Summarizing selected sections…', false);
+  startBtn.disabled = true;
+  const prevLabel = startBtn.textContent;
+  startBtn.textContent = 'Summarizing…';
+
+  try {
+    const res = await apiFetch('/api/summarize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: sourceText,
+        title: loadedContent?.title || '',
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    manualSelection = data.summary;
+    invalidateSavedProgress();
+    updatePreview(data.summary);
+    setSelectStatus('', false);
+    quickreadTrack('summarize_success', {
+      sourceWords: countWords(sourceText),
+      summaryWords: countWords(data.summary),
+    });
+    return true;
+  } catch (err) {
+    const msg = err.message || 'Summary failed';
+    setSelectStatus(msg, true);
+    quickreadTrack('summarize_error', { reason: msg });
+    return false;
+  } finally {
+    startBtn.textContent = prevLabel;
+    updateWordCount();
+  }
+}
+
+async function beginReadingFlow() {
+  const sourceText = getSelectedText();
+  if (!sourceText) return;
+
+  lastReadWasSummary = false;
+  if (summaryToggle?.checked) {
+    const ok = await summarizeIntoSelection(sourceText);
+    if (!ok) return;
+    lastReadWasSummary = true;
+  }
+  startReading();
+}
+
 function startReading() {
   const text = getSelectedText();
   if (!text) return;
@@ -1314,7 +1647,11 @@ function startReading() {
   renderWord();
   updateProgress();
 
-  quickreadTrack('read_start', { words: words.length, type: loadedContent?.type || 'text' });
+  quickreadTrack('read_start', {
+    words: words.length,
+    type: loadedContent?.type || 'text',
+    summarized: lastReadWasSummary,
+  });
 
   if (resume) {
     saveSession();
@@ -1323,7 +1660,19 @@ function startReading() {
   }
 }
 
-startBtn.addEventListener('click', startReading);
+startBtn.addEventListener('click', () => {
+  void beginReadingFlow();
+});
+
+if (summaryToggle) {
+  summaryToggle.addEventListener('change', () => {
+    localStorage.setItem('quickread-ai-summary', summaryToggle.checked ? '1' : '0');
+    manualSelection = '';
+    setSelectStatus('');
+    invalidateSavedProgress();
+    updateWordCount();
+  });
+}
 
 shareLinkBtn.addEventListener('click', async () => {
   const url = buildShareUrl();
@@ -1356,14 +1705,6 @@ continuePdfBtn.addEventListener('click', async () => {
   finishOverlay.classList.add('hidden');
   await loadPdfPages();
   startReading();
-});
-
-fullscreenBtn.addEventListener('click', () => {
-  if (document.fullscreenElement) {
-    document.exitFullscreen();
-  } else {
-    readerPanel.requestFullscreen?.();
-  }
 });
 
 // File upload
@@ -1483,13 +1824,45 @@ backStartBtn.addEventListener('click', () => skip(-currentIndex));
 backBtn.addEventListener('click', () => skip(-10));
 forwardBtn.addEventListener('click', () => skip(10));
 
+function keyboardIgnoresSpace(el) {
+  if (!el || !(el instanceof HTMLElement)) return false;
+  const tag = el.tagName;
+  if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
+  if (tag === 'INPUT') {
+    const type = (el.type || 'text').toLowerCase();
+    return !['button', 'submit', 'checkbox', 'radio', 'range', 'reset'].includes(type);
+  }
+  return el.isContentEditable;
+}
+
+function handleSpaceStop() {
+  if (keyboardIgnoresSpace(document.activeElement)) return false;
+
+  const finderLive =
+    !wpmFinderPanel.classList.contains('hidden') &&
+    !wpmFinderActive.classList.contains('hidden') &&
+    calRunning;
+  if (finderLive) {
+    finishCalTest(calWpm);
+    return true;
+  }
+
+  if (!readerPanel.classList.contains('hidden')) {
+    togglePlayPause();
+    return true;
+  }
+
+  return false;
+}
+
 document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' && handleSpaceStop()) {
+    e.preventDefault();
+    return;
+  }
+
   if (readerPanel.classList.contains('hidden')) return;
   switch (e.code) {
-    case 'Space':
-      e.preventDefault();
-      togglePlayPause();
-      break;
     case 'ArrowLeft':
       skip(-1);
       break;
@@ -1531,14 +1904,22 @@ function showWpmFinder() {
   wpmFinderIntro.classList.remove('hidden');
   wpmFinderActive.classList.add('hidden');
   wpmFinderResult.classList.add('hidden');
+  finderSettings?.classList.remove('hidden');
 }
 
 function scheduleCalWord() {
   clearTimeout(calTimer);
   if (!calRunning) return;
 
-  if (calWordQueue.length === 0) refillCalQueue(calWpm);
+  if (calWordQueue.length === 0) {
+    if (calWpm >= CAL_WPM_MAX) {
+      finishCalTest(CAL_WPM_MAX);
+      return;
+    }
+    refillCalQueue(calWpm);
+  }
   const word = calWordQueue.shift();
+  calCurrentWord = word;
   renderWordIn(finderWordContainer, word, true);
 
   const delay = wordDelayMs(word, calWpm);
@@ -1559,14 +1940,15 @@ function bumpCalWpm() {
   finderWpmLabel.textContent = `${calWpm} WPM`;
   injectCalSpeedup();
   scheduleCalWord();
-  calLevelTimer = setTimeout(bumpCalWpm, CAL_LEVEL_MS);
+  // The top level plays to the end of its passage instead of being cut short.
+  if (calWpm < CAL_WPM_MAX) calLevelTimer = setTimeout(bumpCalWpm, CAL_LEVEL_MS);
 }
 
 function startCalTest() {
   stopCalTest();
   calWpm = CAL_WPM_START;
   calRunning = true;
-  primeCalQueue(true);
+  primeCalQueue();
 
   wpmFinderIntro.classList.add('hidden');
   wpmFinderActive.classList.remove('hidden');
@@ -1579,23 +1961,44 @@ function startCalTest() {
 
 function stopCalTest() {
   calRunning = false;
+  calCurrentWord = '';
   clearTimeout(calTimer);
   clearTimeout(calLevelTimer);
+}
+
+const NOVEL_WORDS = 90000;
+
+function formatHours(hours) {
+  if (hours >= 10) return String(Math.round(hours));
+  return String(Math.round(hours * 10) / 10).replace(/\.0$/, '');
+}
+
+function finderFactText(speed) {
+  const yours = formatHours(NOVEL_WORDS / speed / 60);
+  const average = formatHours(NOVEL_WORDS / CAL_WPM_START / 60);
+
+  if (speed <= CAL_WPM_START) {
+    return `That's the average adult reading speed, which puts a 300-page novel at roughly ${yours} hours. Nearly everyone can train past it.`;
+  }
+
+  let text = `Faster than about ${wpmToPercentile(speed)}% of readers. ` +
+    `A 300-page novel takes you around ${yours} hours instead of the ${average} it takes at the average pace of ${CAL_WPM_START} WPM.`;
+  if (speed >= 600) {
+    text += ` This is your ceiling, not your cruising speed - most people set their default 50 to 100 below it.`;
+  }
+  return text;
 }
 
 function finishCalTest(finalWpm) {
   stopCalTest();
   finderScore.textContent = finalWpm;
+  if (finderFact) finderFact.textContent = finderFactText(finalWpm);
   wpmFinderActive.classList.add('hidden');
   wpmFinderResult.classList.remove('hidden');
+  finderSettings?.classList.add('hidden');
 }
 
 findWpmBtn.addEventListener('click', showWpmFinder);
-wpmNudgeStart?.addEventListener('click', showWpmFinder);
-wpmNudgeDismiss?.addEventListener('click', () => {
-  localStorage.setItem('quickread-wpm-nudge-dismissed', '1');
-  wpmNudge?.classList.add('hidden');
-});
 
 wpmFinderBack.addEventListener('click', () => {
   stopCalTest();
@@ -1612,7 +2015,6 @@ function applyFinderSpeed() {
   setWpm(speed);
   localStorage.setItem('quickread-wpm', String(speed));
   localStorage.setItem('quickread-wpm-calibrated', '1');
-  wpmNudge?.classList.add('hidden');
   return speed;
 }
 
@@ -1639,6 +2041,7 @@ wpmFinderTry.addEventListener('click', () => {
 wpmFinderRetry.addEventListener('click', () => {
   wpmFinderResult.classList.add('hidden');
   wpmFinderIntro.classList.remove('hidden');
+  finderSettings?.classList.remove('hidden');
 });
 
 // Init
@@ -1651,12 +2054,16 @@ if (savedSentencePause !== null) {
   sentencePauseToggle.checked = sentencePauseEnabled;
 }
 
+if (summaryToggle && localStorage.getItem('quickread-ai-summary') === '1') {
+  summaryToggle.checked = true;
+}
+
 const savedFontSize = localStorage.getItem('quickread-font-size');
 if (savedFontSize) {
   fontSlider.value = savedFontSize;
   setFontSize(parseFloat(savedFontSize));
 } else {
-  setFontSize(3.5);
+  setFontSize(FONT_SIZE_DEFAULT);
 }
 
 let resizeFitTimer;
@@ -1664,6 +2071,9 @@ window.addEventListener('resize', () => {
   clearTimeout(resizeFitTimer);
   resizeFitTimer = setTimeout(() => {
     if (!readerPanel.classList.contains('hidden') && words.length) renderWord();
+    if (calRunning && calCurrentWord) {
+      renderWordIn(finderWordContainer, calCurrentWord, true);
+    }
   }, 100);
 });
 
@@ -1703,15 +2113,6 @@ if (localStorage.getItem('quickread-used')) {
   examplesEl?.classList.add('hidden');
 }
 
-if (
-  wpmNudge
-  && !localStorage.getItem('quickread-wpm-calibrated')
-  && !localStorage.getItem('quickread-wpm-nudge-dismissed')
-  && !localStorage.getItem('quickread-wpm')
-) {
-  wpmNudge.classList.remove('hidden');
-}
-
 renderRecents();
 checkResume();
 
@@ -1738,6 +2139,16 @@ if (launchSource === 'extension') {
 }
 
 quickreadTrack('page_view');
+
+const bookmarkletLink = document.getElementById('bookmarkletLink');
+if (bookmarkletLink) {
+  const bookmarklet = `javascript:(function(){const u=encodeURIComponent(location.href);window.open(${JSON.stringify(`${location.origin}/app?source=bookmarklet&url=`)}+u,'_blank');})();`;
+  bookmarkletLink.href = bookmarklet;
+  bookmarkletLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    alert('Drag this link to your bookmarks bar, then click it on any article to open Quickread.');
+  });
+}
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});

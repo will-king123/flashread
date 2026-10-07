@@ -17,10 +17,17 @@ const SITE_URL = process.env.SITE_URL || process.env.RENDER_EXTERNAL_URL || `htt
 
 app.set('trust proxy', 1);
 app.get('/health', (_req, res) => res.status(200).send('ok'));
+app.get('/app', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'app.html'));
+});
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-const ALLOWED_EVENTS = new Set(['page_view', 'fetch_success', 'fetch_error', 'read_start', 'read_finish']);
+const ALLOWED_EVENTS = new Set([
+  'page_view', 'fetch_success', 'fetch_error', 'read_start', 'read_finish',
+  'summarize_success', 'summarize_error',
+]);
+const SUMMARIZE_MAX_CHARS = 120_000;
 const metrics = {};
 
 const rateBuckets = new Map();
@@ -34,7 +41,7 @@ function rateLimit(req, res, next) {
   }
   bucket.count++;
   if (bucket.count > 30) {
-    return res.status(429).json({ error: 'Too many requests — wait a minute and try again' });
+    return res.status(429).json({ error: 'Too many requests - wait a minute and try again' });
   }
   next();
 }
@@ -176,27 +183,27 @@ async function pdfPageCount(buffer) {
 function fetchErrorMessage(err) {
   const code = err.cause?.code || '';
   if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') {
-    return "Couldn't find that site — check the URL";
+    return "Couldn't find that site - check the URL";
   }
   if (code === 'ECONNREFUSED' || code === 'ETIMEDOUT' || code === 'UND_ERR_CONNECT_TIMEOUT') {
-    return "Couldn't reach that site — it may be down or blocking requests";
+    return "Couldn't reach that site - it may be down or blocking requests";
   }
   if (err.name === 'TimeoutError' || code === 'ABORT_ERR') {
-    return 'That site took too long to respond — try again or paste the text directly';
+    return 'That site took too long to respond - try again or paste the text directly';
   }
   if (err.message === 'fetch failed') {
-    return "Couldn't reach that site — check your connection";
+    return "Couldn't reach that site - check your connection";
   }
   return err.message || 'Failed to fetch link';
 }
 
 function httpStatusMessage(status) {
   if (status === 401 || status === 403) {
-    return 'That page is behind a login or paywall — paste the text or upload a PDF instead';
+    return 'That page is behind a login or paywall - paste the text or upload a PDF instead';
   }
-  if (status === 404) return "That page doesn't exist — check the URL";
-  if (status === 429) return 'That site is rate-limiting us — wait a minute and try again';
-  if (status >= 500) return 'That site had a server error — try again later';
+  if (status === 404) return "That page doesn't exist - check the URL";
+  if (status === 429) return 'That site is rate-limiting us - wait a minute and try again';
+  if (status >= 500) return 'That site had a server error - try again later';
   return `Could not fetch that page (${status})`;
 }
 
@@ -205,21 +212,21 @@ function htmlExtractError(html, text) {
   const scriptCount = (html.match(/<script/gi) || []).length;
 
   if (/subscribe|sign in to read|members only|paywall|premium content|registration required/.test(lower) && text.length < 800) {
-    return 'That article is behind a paywall — paste the text or upload a PDF instead';
+    return 'That article is behind a paywall - paste the text or upload a PDF instead';
   }
   if (text.length < 100 && scriptCount > 8) {
-    return 'That site loads its content with JavaScript — paste the text or upload a file instead';
+    return 'That site loads its content with JavaScript - paste the text or upload a file instead';
   }
-  return 'Could not extract readable text — try pasting the article or uploading a file';
+  return 'Could not extract readable text - try pasting the article or uploading a file';
 }
 
 function pdfExtractError() {
-  return 'No readable text found — this PDF may be scanned images. Try a text-based PDF or paste the content';
+  return 'No readable text found - this PDF may be scanned images. Try a text-based PDF or paste the content';
 }
 
 function assertSize(bytes) {
   if (bytes > MAX_BYTES) {
-    throw new Error('That file is too large (max 25 MB) — try a smaller PDF or paste the text');
+    throw new Error('That file is too large (max 25 MB) - try a smaller PDF or paste the text');
   }
 }
 
@@ -341,6 +348,73 @@ app.post('/api/parse-pdf', rateLimit, express.raw({ type: 'application/pdf', lim
   }
 });
 
+async function summarizeWithAi(text, title = '') {
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  if (!apiKey) {
+    const err = new Error('AI summary is not set up on this server');
+    err.code = 'NO_AI';
+    throw err;
+  }
+
+  const source = text.length > SUMMARIZE_MAX_CHARS
+    ? `${text.slice(0, SUMMARIZE_MAX_CHARS)}…`
+    : text;
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: process.env.OPENAI_SUMMARY_MODEL || 'gpt-4o-mini',
+      temperature: 0.35,
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You write summaries for speed reading one word at a time. Output only the summary: flowing prose, plain English, no title, no bullets, no markdown. Keep the important facts and reasoning. Be shorter than the source unless the source is already brief.',
+        },
+        {
+          role: 'user',
+          content: title
+            ? `Title: ${title}\n\nSummarize:\n\n${source}`
+            : `Summarize:\n\n${source}`,
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    console.error('openai summarize', response.status, await response.text().catch(() => ''));
+    throw new Error(response.status === 401
+      ? 'AI summary key is invalid'
+      : 'AI summary failed - try again');
+  }
+
+  const data = await response.json();
+  const summary = cleanText(data.choices?.[0]?.message?.content || '');
+  if (summary.length < 20) throw new Error('AI summary came back empty');
+  return summary;
+}
+
+app.post('/api/summarize', rateLimit, async (req, res) => {
+  try {
+    const { text, title } = req.body || {};
+    if (!text || typeof text !== 'string') {
+      return res.status(400).json({ error: 'Nothing to summarize' });
+    }
+    if (text.trim().length < 80) {
+      return res.status(400).json({ error: 'Selected text is too short to summarize' });
+    }
+    const summary = await summarizeWithAi(text, typeof title === 'string' ? title : '');
+    res.json({ summary });
+  } catch (err) {
+    const status = err.code === 'NO_AI' ? 503 : 500;
+    res.status(status).json({ error: err.message || 'Summary failed' });
+  }
+});
+
 app.post('/api/event', rateLimit, (req, res) => {
   const { event, detail } = req.body || {};
   if (!ALLOWED_EVENTS.has(event)) {
@@ -373,7 +447,7 @@ app.get('/sitemap.xml', (_req, res) => {
 
 app.use((err, req, res, next) => {
   if (err.type === 'entity.too.large') {
-    return res.status(413).json({ error: 'File is too large (max 25 MB) — try a smaller PDF or paste the text' });
+    return res.status(413).json({ error: 'File is too large (max 25 MB) - try a smaller PDF or paste the text' });
   }
   next(err);
 });

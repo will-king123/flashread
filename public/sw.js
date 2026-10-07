@@ -1,5 +1,21 @@
-const CACHE = 'quickread-v5';
-const PRECACHE = ['/', '/index.html', '/app.js', '/analytics.js', '/styles.css', '/favicon.svg', '/icon-192.png', '/icon-512.png', '/manifest.json', '/og-image.svg', '/privacy.html'];
+const CACHE = 'quickread-v6';
+const PRECACHE = [
+  '/',
+  '/app',
+  '/index.html',
+  '/app.html',
+  '/app.js',
+  '/analytics.js',
+  '/landing.js',
+  '/styles.css',
+  '/landing.css',
+  '/favicon.svg',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/manifest.json',
+  '/og-image.svg',
+  '/privacy.html',
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -15,6 +31,11 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+function offlinePage(pathname) {
+  if (pathname === '/app' || pathname.startsWith('/app/')) return '/app.html';
+  return '/index.html';
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -23,14 +44,14 @@ self.addEventListener('fetch', (event) => {
 
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() => caches.match('/index.html'))
+      fetch(request).catch(() => caches.match(offlinePage(url.pathname)))
     );
     return;
   }
 
   if (request.method !== 'GET') return;
 
-  const isAppShell = ['/app.js', '/styles.css', '/index.html'].includes(url.pathname);
+  const isAppShell = ['/app.js', '/styles.css', '/index.html', '/app.html', '/landing.js', '/landing.css'].includes(url.pathname);
 
   event.respondWith(
     fetch(request).then((response) => {
@@ -40,7 +61,7 @@ self.addEventListener('fetch', (event) => {
       return response;
     }).catch(() => caches.match(request).then((cached) => {
       if (cached) return cached;
-      if (isAppShell && url.pathname !== '/index.html') return caches.match('/index.html');
+      if (isAppShell) return caches.match('/index.html');
       return Response.error();
     }))
   );

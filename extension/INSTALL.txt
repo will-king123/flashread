@@ -1,0 +1,10 @@
+Quickread extension (not on Chrome Web Store yet)
+
+1. Open Chrome as williamstephenkingg@gmail.com (Person 1)
+2. Go to chrome://extensions
+3. Turn ON "Developer mode" (top right)
+4. Click "Load unpacked"
+5. Choose this folder:
+   /Users/30m/Speedread/extension
+
+Pin Quickread from the puzzle icon. Shortcut: Alt+Q

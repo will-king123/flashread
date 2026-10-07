@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Metrics — Quickread</title>
+  <title>Metrics - Quickread</title>
   <meta name="robots" content="noindex">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
@@ -17,13 +17,31 @@
     .metric-row { display: flex; justify-content: space-between; padding: 0.625rem 0; border-bottom: 1px solid var(--border); font-size: 0.9375rem; }
     .metric-row span:last-child { font-variant-numeric: tabular-nums; font-weight: 500; }
     .metrics-error { color: var(--accent); font-size: 0.875rem; }
-    .metrics-back { display: inline-block; margin-bottom: 1.5rem; font-size: 0.875rem; color: var(--text-muted); text-decoration: none; }
-    .metrics-back:hover { color: var(--accent); }
+    .subpage-bar {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 1.25rem 1.5rem 0;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .subpage-logo {
+      font-family: 'Literata', Georgia, serif;
+      font-size: 1.25rem;
+      font-weight: 500;
+      color: var(--text);
+      text-decoration: none;
+    }
   </style>
 </head>
 <body>
+  <header class="subpage-bar">
+    <a href="/" class="header-home-btn" aria-label="Home">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-9.5z"/><path d="M9 21V12h6v9"/></svg>
+    </a>
+    <a class="subpage-logo" href="/">Quickread</a>
+  </header>
   <div class="metrics-page">
-    <a class="metrics-back" href="/">← Back</a>
     <h1>Usage metrics</h1>
     <p class="hint">Anonymous counts since last server restart. Resets on deploy.</p>
     <div id="metricsList"></div>
