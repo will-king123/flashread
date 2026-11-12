@@ -471,7 +471,6 @@ const fileDrop = document.getElementById('fileDrop');
 const fileInput = document.getElementById('fileInput');
 const fileBrowseBtn = document.getElementById('fileBrowseBtn');
 const startBtn = document.getElementById('startBtn');
-const summaryToggle = document.getElementById('summaryToggle');
 const selectStatus = document.getElementById('selectStatus');
 const shareLinkBtn = document.getElementById('shareLinkBtn');
 const readerDisplay = document.getElementById('readerDisplay');
@@ -1187,7 +1186,7 @@ sectionList.addEventListener('click', (e) => {
   manualSelection = '';
   invalidateSavedProgress();
   updateWordCount();
-  void beginReadingFlow();
+  startReading();
 });
 
 selectAllBtn.addEventListener('click', () => {
@@ -1233,10 +1232,6 @@ function updateTimeEstimate() {
   const w = tokenize(getSelectedText());
   if (w.length === 0) {
     timeEstimate.textContent = '';
-    return;
-  }
-  if (summaryToggle?.checked && !manualSelection) {
-    timeEstimate.textContent = 'AI will shorten this before you read';
     return;
   }
   timeEstimate.textContent = `~${formatTime(estimateReadingSeconds(w, wpm))} at ${wpm} WPM`;
@@ -1335,7 +1330,7 @@ function showSelectPanel(data) {
   }
 
   if (shouldAutoStart(data) && countWords(getSelectedText()) > 0) {
-    void beginReadingFlow();
+    startReading();
   }
 }
 
@@ -1565,59 +1560,6 @@ function skip(delta) {
   if (isPlaying) restartTimer();
 }
 
-let lastReadWasSummary = false;
-
-async function summarizeIntoSelection(sourceText) {
-  setSelectStatus('Summarizing selected sections…', false);
-  startBtn.disabled = true;
-  const prevLabel = startBtn.textContent;
-  startBtn.textContent = 'Summarizing…';
-
-  try {
-    const res = await apiFetch('/api/summarize', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text: sourceText,
-        title: loadedContent?.title || '',
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
-
-    manualSelection = data.summary;
-    invalidateSavedProgress();
-    updatePreview(data.summary);
-    setSelectStatus('', false);
-    quickreadTrack('summarize_success', {
-      sourceWords: countWords(sourceText),
-      summaryWords: countWords(data.summary),
-    });
-    return true;
-  } catch (err) {
-    const msg = err.message || 'Summary failed';
-    setSelectStatus(msg, true);
-    quickreadTrack('summarize_error', { reason: msg });
-    return false;
-  } finally {
-    startBtn.textContent = prevLabel;
-    updateWordCount();
-  }
-}
-
-async function beginReadingFlow() {
-  const sourceText = getSelectedText();
-  if (!sourceText) return;
-
-  lastReadWasSummary = false;
-  if (summaryToggle?.checked) {
-    const ok = await summarizeIntoSelection(sourceText);
-    if (!ok) return;
-    lastReadWasSummary = true;
-  }
-  startReading();
-}
-
 function startReading() {
   const text = getSelectedText();
   if (!text) return;
@@ -1650,7 +1592,6 @@ function startReading() {
   quickreadTrack('read_start', {
     words: words.length,
     type: loadedContent?.type || 'text',
-    summarized: lastReadWasSummary,
   });
 
   if (resume) {
@@ -1661,18 +1602,8 @@ function startReading() {
 }
 
 startBtn.addEventListener('click', () => {
-  void beginReadingFlow();
+  startReading();
 });
-
-if (summaryToggle) {
-  summaryToggle.addEventListener('change', () => {
-    localStorage.setItem('quickread-ai-summary', summaryToggle.checked ? '1' : '0');
-    manualSelection = '';
-    setSelectStatus('');
-    invalidateSavedProgress();
-    updateWordCount();
-  });
-}
 
 shareLinkBtn.addEventListener('click', async () => {
   const url = buildShareUrl();
@@ -2052,10 +1983,6 @@ const savedSentencePause = localStorage.getItem('quickread-sentence-pause');
 if (savedSentencePause !== null) {
   sentencePauseEnabled = savedSentencePause === '1';
   sentencePauseToggle.checked = sentencePauseEnabled;
-}
-
-if (summaryToggle && localStorage.getItem('quickread-ai-summary') === '1') {
-  summaryToggle.checked = true;
 }
 
 const savedFontSize = localStorage.getItem('quickread-font-size');

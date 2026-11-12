@@ -3,9 +3,40 @@ import express from 'express';
 import { fileURLToPath } from 'url';
 import path from 'path';
 
+function installPdfPolyfills() {
+  if (globalThis.DOMMatrix) return;
+  class DOMMatrix {
+    constructor(init) {
+      this.a = 1; this.b = 0; this.c = 0; this.d = 1; this.e = 0; this.f = 0;
+      this.is2D = true;
+      if (Array.isArray(init) && init.length === 6) {
+        [this.a, this.b, this.c, this.d, this.e, this.f] = init;
+      }
+    }
+    multiplySelf() { return this; }
+    preMultiplySelf() { return this; }
+    translate() { return this; }
+    translateSelf() { return this; }
+    scale() { return this; }
+    scaleSelf() { return this; }
+    invertSelf() { return this; }
+    inverse() { return new DOMMatrix(); }
+    multiply() { return new DOMMatrix(); }
+    transformPoint(point) { return point || { x: 0, y: 0 }; }
+  }
+  globalThis.DOMMatrix = DOMMatrix;
+}
+
 let PDFParse;
 async function loadPdfParse() {
-  if (!PDFParse) ({ PDFParse } = await import('pdf-parse'));
+  installPdfPolyfills();
+  if (!PDFParse) {
+    // pdf.js loads its worker with a relative import that Vercel does not
+    // bundle. Importing it here puts WorkerMessageHandler on globalThis so
+    // text extraction runs in-process.
+    await import('pdfjs-dist/legacy/build/pdf.worker.mjs');
+    ({ PDFParse } = await import('pdf-parse'));
+  }
   return PDFParse;
 }
 
@@ -13,7 +44,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3000;
 const MAX_BYTES = 25 * 1024 * 1024;
-const SITE_URL = process.env.SITE_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+const SITE_URL = process.env.SITE_URL
+  || (process.env.VERCEL_ENV === 'production' ? 'https://quickread.uk' : '')
+  || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '')
+  || process.env.RENDER_EXTERNAL_URL
+  || `http://localhost:${PORT}`;
 
 app.set('trust proxy', 1);
 app.get('/health', (_req, res) => res.status(200).send('ok'));
@@ -25,9 +60,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const ALLOWED_EVENTS = new Set([
   'page_view', 'fetch_success', 'fetch_error', 'read_start', 'read_finish',
-  'summarize_success', 'summarize_error',
 ]);
-const SUMMARIZE_MAX_CHARS = 120_000;
 const metrics = {};
 
 const rateBuckets = new Map();
@@ -127,7 +160,12 @@ function extractSections(doc) {
     sections.push({ ...current, text: cleanText(current.text) });
   }
 
-  return sections.filter(s => s.text.length > 30);
+  const result = sections.filter(s => s.text.length > 30);
+  // Text before the first heading is the lead, not the whole page.
+  if (result.length > 1 && result[0].id === 's0') {
+    result[0].title = 'Introduction';
+  }
+  return result;
 }
 
 async function extractHtmlContent(html) {
@@ -348,73 +386,6 @@ app.post('/api/parse-pdf', rateLimit, express.raw({ type: 'application/pdf', lim
   }
 });
 
-async function summarizeWithAi(text, title = '') {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
-  if (!apiKey) {
-    const err = new Error('AI summary is not set up on this server');
-    err.code = 'NO_AI';
-    throw err;
-  }
-
-  const source = text.length > SUMMARIZE_MAX_CHARS
-    ? `${text.slice(0, SUMMARIZE_MAX_CHARS)}…`
-    : text;
-
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: process.env.OPENAI_SUMMARY_MODEL || 'gpt-4o-mini',
-      temperature: 0.35,
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You write summaries for speed reading one word at a time. Output only the summary: flowing prose, plain English, no title, no bullets, no markdown. Keep the important facts and reasoning. Be shorter than the source unless the source is already brief.',
-        },
-        {
-          role: 'user',
-          content: title
-            ? `Title: ${title}\n\nSummarize:\n\n${source}`
-            : `Summarize:\n\n${source}`,
-        },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    console.error('openai summarize', response.status, await response.text().catch(() => ''));
-    throw new Error(response.status === 401
-      ? 'AI summary key is invalid'
-      : 'AI summary failed - try again');
-  }
-
-  const data = await response.json();
-  const summary = cleanText(data.choices?.[0]?.message?.content || '');
-  if (summary.length < 20) throw new Error('AI summary came back empty');
-  return summary;
-}
-
-app.post('/api/summarize', rateLimit, async (req, res) => {
-  try {
-    const { text, title } = req.body || {};
-    if (!text || typeof text !== 'string') {
-      return res.status(400).json({ error: 'Nothing to summarize' });
-    }
-    if (text.trim().length < 80) {
-      return res.status(400).json({ error: 'Selected text is too short to summarize' });
-    }
-    const summary = await summarizeWithAi(text, typeof title === 'string' ? title : '');
-    res.json({ summary });
-  } catch (err) {
-    const status = err.code === 'NO_AI' ? 503 : 500;
-    res.status(status).json({ error: err.message || 'Summary failed' });
-  }
-});
-
 app.post('/api/event', rateLimit, (req, res) => {
   const { event, detail } = req.body || {};
   if (!ALLOWED_EVENTS.has(event)) {
@@ -452,13 +423,19 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
-setInterval(() => {
-  if (Object.keys(metrics).length) console.log('[metrics]', JSON.stringify(metrics));
-}, 5 * 60 * 1000);
+if (!process.env.VERCEL) {
+  setInterval(() => {
+    if (Object.keys(metrics).length) console.log('[metrics]', JSON.stringify(metrics));
+  }, 5 * 60 * 1000);
+}
 
 process.on('uncaughtException', (err) => console.error('uncaughtException:', err));
 process.on('unhandledRejection', (err) => console.error('unhandledRejection:', err));
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Quickread running on port ${PORT}`);
-});
+export default app;
+
+if (!process.env.VERCEL) {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Quickread running on port ${PORT}`);
+  });
+}
