@@ -688,10 +688,11 @@ function applyAccent(name) {
 
 const savedTheme = localStorage.getItem('quickread-theme') || 'light';
 document.documentElement.setAttribute('data-theme', savedTheme);
+themeToggle.checked = savedTheme === 'dark';
 applyAccent(currentAccent);
 
-themeToggle.addEventListener('click', () => {
-  const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+themeToggle.addEventListener('change', () => {
+  const next = themeToggle.checked ? 'dark' : 'light';
   document.documentElement.setAttribute('data-theme', next);
   localStorage.setItem('quickread-theme', next);
   applyAccent(currentAccent);
@@ -1370,29 +1371,40 @@ function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+function wordFitScale(container, display) {
+  const range = document.createRange();
+  range.selectNodeContents(container);
+  const text = range.getBoundingClientRect();
+  if (text.width === 0) return 1;
+
+  const box = display.getBoundingClientRect();
+  const pad = 16;
+  const center = (box.left + box.right) / 2;
+  const leftExtent = Math.max(1, center - text.left);
+  const rightExtent = Math.max(1, text.right - center);
+  const leftRoom = Math.max(1, center - (box.left + pad));
+  const rightRoom = Math.max(1, (box.right - pad) - center);
+  return Math.min(1, leftRoom / leftExtent, rightRoom / rightExtent);
+}
+
 function fitWordSize(container) {
   const display = container.closest('.reader-display');
-  if (!display) return;
+  if (!display || display.clientWidth <= 0) return;
 
   const desiredPx = fontSize * FONT_SIZE_PX_PER_REM;
-  const available = display.clientWidth - 32;
   container.style.transform = '';
   container.style.fontSize = `${desiredPx}px`;
 
-  if (available <= 0 || container.scrollWidth <= available) return;
+  let size = desiredPx;
+  for (let i = 0; i < 3; i++) {
+    const scale = wordFitScale(container, display);
+    if (scale >= 0.995) return;
+    size = Math.max(1, size * scale);
+    container.style.fontSize = `${size}px`;
+  }
 
-  let lo = 12;
-  let hi = desiredPx;
-  while (lo < hi) {
-    const mid = Math.ceil((lo + hi) / 2);
-    container.style.fontSize = `${mid}px`;
-    if (container.scrollWidth > available) hi = mid - 1;
-    else lo = mid;
-  }
-  container.style.fontSize = `${lo}px`;
-  if (desiredPx > lo) {
-    container.style.transform = `scale(${desiredPx / lo})`;
-  }
+  const remainder = wordFitScale(container, display);
+  if (remainder < 0.995) container.style.transform = `scale(${remainder})`;
 }
 
 function renderWordIn(container, word, useFocal) {

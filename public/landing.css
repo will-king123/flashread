@@ -8,7 +8,7 @@
 
 .landing-top {
   position: relative;
-  margin-bottom: 2.5rem;
+  margin-bottom: 3rem;
 }
 
 .landing-top::before {
@@ -18,8 +18,10 @@
   transform: translateX(-50%);
   width: 100vw;
   top: -1.25rem;
-  height: min(22rem, 52vh);
-  background: linear-gradient(180deg, var(--reader-bg) 0%, var(--bg) 100%);
+  height: min(30rem, 70vh);
+  background:
+    radial-gradient(ellipse 60% 55% at 70% 20%, var(--select-bg), transparent 70%),
+    linear-gradient(180deg, var(--reader-bg) 0%, var(--bg) 100%);
   pointer-events: none;
   z-index: 0;
 }
@@ -29,6 +31,61 @@
   z-index: 1;
 }
 
+.landing {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 1.25rem 1.5rem 3rem;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.landing-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  z-index: 5;
+}
+
+.landing-logo {
+  font-family: 'Newsreader', Georgia, serif;
+  font-size: 1.5rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.landing-logo:hover {
+  color: var(--accent);
+}
+
+.landing-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.landing-nav-link {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-decoration: none;
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.landing-nav-link:hover {
+  color: var(--text);
+  background: var(--select-bg);
+}
+
+/* Banner demo */
 .landing-stage {
   text-align: center;
   padding: 1.5rem 0 0.5rem;
@@ -51,7 +108,7 @@
 .landing-banner-inner .word-container {
   position: relative;
   inset: unset;
-  font-family: 'Literata', Georgia, serif;
+  font-family: 'Newsreader', Georgia, serif;
   font-size: clamp(1.75rem, 5vw, 2.75rem);
   font-weight: 400;
   letter-spacing: 0.02em;
@@ -59,137 +116,142 @@
   max-width: 100%;
 }
 
-.landing {
-  max-width: 56rem;
-  margin: 0 auto;
-  padding: 1.25rem 1.5rem 3rem;
-  min-height: 0;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.landing-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.5rem;
-}
-
-.landing-logo {
-  font-family: 'Literata', Georgia, serif;
-  font-size: 1.375rem;
-  font-weight: 500;
-  letter-spacing: -0.02em;
-  color: var(--text);
-  text-decoration: none;
-}
-
-.landing-nav {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.landing-welcome {
-  padding-top: 2rem;
+/* Hero */
+.landing-hero {
+  padding-top: 1.5rem;
 }
 
 .landing-title {
-  font-family: 'Literata', Georgia, serif;
-  font-size: clamp(1.75rem, 4.2vw, 2.25rem);
-  font-weight: 500;
-  line-height: 1.2;
-  letter-spacing: -0.03em;
-  margin-bottom: 0.625rem;
+  font-family: 'Newsreader', Georgia, serif;
+  font-size: clamp(2.25rem, 5.5vw, 3.25rem);
+  font-weight: 400;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  margin-bottom: 1rem;
+  text-wrap: balance;
+}
+
+.landing-title em {
+  font-style: italic;
+  color: var(--accent);
 }
 
 .landing-tagline {
-  font-size: 1.0625rem;
-  line-height: 1.55;
-  color: var(--text-muted);
+  font-family: 'Newsreader', Georgia, serif;
+  font-size: clamp(1.125rem, 2vw, 1.3125rem);
+  line-height: 1.45;
+  color: var(--text);
   margin-bottom: 1rem;
-  max-width: 40ch;
+  max-width: 34ch;
+  text-wrap: pretty;
 }
 
 .landing-intro {
   font-size: 1rem;
-  line-height: 1.6;
+  line-height: 1.65;
   color: var(--text-muted);
   max-width: 46ch;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.75rem;
+  text-wrap: pretty;
 }
 
 .landing-cta-row {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.625rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem 1.25rem;
 }
 
 .landing-cta {
   display: inline-block;
   text-decoration: none;
   text-align: center;
-  padding: 0.875rem 1.75rem;
+  padding: 0.9375rem 1.75rem;
+  font-size: 1rem;
 }
 
-.landing-section-title {
-  font-family: 'Literata', Georgia, serif;
-  font-size: 1.25rem;
+.landing-cta-secondary {
+  font-size: 0.9375rem;
   font-weight: 500;
-  margin-bottom: 1.25rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.landing-cta-secondary:hover {
+  color: var(--accent);
+}
+
+/* Sections */
+.landing-section-title {
+  font-family: 'Newsreader', Georgia, serif;
+  font-size: 1.625rem;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  margin-bottom: 1.5rem;
 }
 
 .landing-steps {
-  margin-bottom: 3rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--border);
+  margin-bottom: 3.5rem;
 }
 
 .landing-step-list {
   list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
   margin: 0;
   padding: 0;
 }
 
-.landing-step-list li {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 1rem 1.25rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 1px solid var(--border);
+@media (min-width: 720px) {
+  .landing-step-list {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+  }
 }
 
-.landing-step-list li:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
+.landing-step-list li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.375rem 1.375rem 1.5rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.landing-step-list li:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
 }
 
 .landing-step-num {
-  font-family: 'Literata', Georgia, serif;
-  font-size: 1.5rem;
+  font-family: 'Newsreader', Georgia, serif;
+  font-size: 2rem;
   line-height: 1;
   color: var(--accent);
   font-variant-numeric: tabular-nums;
-  padding-top: 0.125rem;
+  font-style: italic;
 }
 
 .landing-step-list h3 {
-  font-size: 1rem;
+  font-size: 1.0625rem;
   font-weight: 600;
-  margin-bottom: 0.375rem;
+  letter-spacing: -0.005em;
+  margin-bottom: 0;
 }
 
 .landing-step-list p {
   font-size: 0.9375rem;
-  line-height: 1.55;
+  line-height: 1.6;
   color: var(--text-muted);
   margin: 0;
+  text-wrap: pretty;
 }
 
 .landing-aside {
@@ -200,44 +262,85 @@
 
 @media (min-width: 640px) {
   .landing-aside {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1.1fr 1fr;
     gap: 2.5rem;
+    align-items: stretch;
   }
 }
 
 .landing-use-list {
+  list-style: none;
   margin: 0;
-  padding-left: 1.125rem;
-  color: var(--text-muted);
-  font-size: 0.9375rem;
-  line-height: 1.65;
+  padding: 0;
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.55;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
-.landing-use-list li + li {
-  margin-top: 0.5rem;
+.landing-use-list li {
+  position: relative;
+  padding: 0.75rem 0 0.75rem 1.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.landing-use-list li:last-child {
+  border-bottom: none;
+}
+
+.landing-use-list li::before {
+  content: '';
+  position: absolute;
+  left: 0.25rem;
+  top: 1.25rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--select-bg);
 }
 
 .landing-aside-cta {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 1.25rem 1.5rem;
-  background: var(--bg-elevated);
+  align-items: flex-start;
+  padding: 1.75rem;
+  background:
+    radial-gradient(ellipse 80% 60% at 100% 0%, var(--select-bg), transparent 70%),
+    var(--bg-elevated);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 18px;
+  box-shadow: var(--shadow-md);
 }
 
 .landing-aside-lead {
-  font-family: 'Literata', Georgia, serif;
-  font-size: 1.125rem;
-  margin-bottom: 1rem;
-  line-height: 1.35;
+  font-family: 'Newsreader', Georgia, serif;
+  font-size: 1.5rem;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  margin-bottom: 1.25rem;
+  line-height: 1.25;
+  text-wrap: balance;
 }
 
 .landing-footer {
   margin-top: auto;
   padding-top: 2rem;
+  border-top: 1px solid var(--border);
   font-size: 0.8125rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.landing-footer-brand {
+  font-family: 'Newsreader', Georgia, serif;
+  font-size: 1rem;
+  color: var(--text-muted);
 }
 
 .landing-footer a {
@@ -252,5 +355,9 @@
 @media (prefers-reduced-motion: reduce) {
   .landing-stage .word-container.word-enter {
     animation: none;
+  }
+
+  .landing-step-list li {
+    transition: none;
   }
 }

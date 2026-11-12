@@ -1,4 +1,4 @@
-const CACHE = 'quickread-v6';
+const CACHE = 'quickread-v7';
 const PRECACHE = [
   '/',
   '/app',

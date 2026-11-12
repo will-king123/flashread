@@ -19,7 +19,7 @@
   <link rel="stylesheet" href="landing.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,500;7..72,600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;500;600&display=swap" rel="stylesheet">
   <script>
     if (/[?&](url|text)=/.test(location.search)) location.replace('/app' + location.search);
   </script>
@@ -30,14 +30,32 @@
       <header class="landing-header">
         <a href="/" class="landing-logo">Quickread</a>
         <nav class="landing-nav">
-          <button type="button" class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
-            <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
-            </svg>
-            <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-            </svg>
-          </button>
+          <a href="/app" class="landing-nav-link">Open app</a>
+          <div class="settings-wrap">
+            <button type="button" class="theme-toggle" id="settingsBtn" aria-label="Settings" aria-expanded="false">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+            </button>
+            <div class="settings-popover hidden" id="settingsPopover">
+              <p class="field-label">Accent colour</p>
+              <div class="accent-picker" role="group" aria-label="Accent colour">
+                <button type="button" class="accent-swatch" data-accent="terracotta" aria-label="Terracotta" aria-pressed="true" style="--swatch: #c45d3e"></button>
+                <button type="button" class="accent-swatch" data-accent="sage" aria-label="Sage" aria-pressed="false" style="--swatch: #5c8a6e"></button>
+                <button type="button" class="accent-swatch" data-accent="teal" aria-label="Teal" aria-pressed="false" style="--swatch: #2a8a8a"></button>
+                <button type="button" class="accent-swatch" data-accent="indigo" aria-label="Indigo" aria-pressed="false" style="--swatch: #5b6eae"></button>
+                <button type="button" class="accent-swatch" data-accent="amber" aria-label="Amber" aria-pressed="false" style="--swatch: #c17f24"></button>
+                <button type="button" class="accent-swatch" data-accent="rose" aria-label="Rose" aria-pressed="false" style="--swatch: #b85c7a"></button>
+              </div>
+              <div class="settings-row">
+                <span class="field-label">Dark mode</span>
+                <label class="switch">
+                  <input type="checkbox" id="themeToggle" aria-label="Toggle dark mode">
+                  <span class="switch-track"><span class="switch-thumb"></span></span>
+                </label>
+              </div>
+            </div>
+          </div>
         </nav>
       </header>
 
@@ -48,12 +66,15 @@
         </div>
       </div>
 
-      <section class="landing-welcome">
-        <h1 class="landing-title">Welcome to Quickread</h1>
-        <p class="landing-tagline">The place you can read faster - without skimming past the bits you actually need.</p>
-        <p class="landing-intro">Paste a Wikipedia link, an article, or a PDF. Pick the sections you care about, then read them one word at a time in your browser. Free, no account.</p>
-        <div class="landing-cta-row">
-          <a href="/app" class="btn btn-primary landing-cta">Use the tool</a>
+      <section class="landing-hero">
+        <div class="landing-welcome">
+          <h1 class="landing-title">Welcome to <em>Quickread</em></h1>
+          <p class="landing-tagline">The place you can read faster - without skimming past the bits you actually need.</p>
+          <p class="landing-intro">Paste a Wikipedia link, an article, or a PDF. Pick the sections you care about, then read them one word at a time in your browser.</p>
+          <div class="landing-cta-row">
+            <a href="/app" class="btn btn-primary landing-cta">Use the tool</a>
+            <a href="#how-heading" class="landing-cta-secondary">See how it works ↓</a>
+          </div>
         </div>
       </section>
     </div>
@@ -103,6 +124,7 @@
     </main>
 
     <footer class="landing-footer">
+      <span class="landing-footer-brand">Quickread</span>
       <a href="/privacy.html">Privacy</a>
     </footer>
   </div>
